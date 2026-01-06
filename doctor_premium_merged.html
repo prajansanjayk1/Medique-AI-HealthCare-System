@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <title>MediQue - Doctor Portal</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- UI Styles --- */
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f3f4f6;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: #1f2937;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        .glass-card-dark {
+            background: rgba(17, 24, 39, 0.95);
+            color: white;
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.8); }
+
+        .nav-btn-active {
+            background-color: #4f46e5 !important;
+            color: white !important;
+        }
+
+        input, select, textarea {
+            background-color: rgba(249, 250, 251, 0.8);
+            border-color: rgba(229, 231, 235, 0.8);
+        }
+        input:focus, select:focus, textarea:focus {
+            background-color: #ffffff;
+            border-color: #6366f1;
+            ring-color: #6366f1;
+            outline: none;
+        }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, setDoc, getDoc, getDocs, orderBy, Timestamp, collectionGroup, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDqdSzRr29kDUH-eDwXTSg_dImTOqyYCiU",
+            authDomain: "main-8c336.firebaseapp.com",
+            projectId: "main-8c336",
+            storageBucket: "main-8c336.firebasestorage.app",
+            messagingSenderId: "507656529909",
+            appId: "1:507656529909:web:ccea008f4a1178bf0da2bc",
+            measurementId: "G-RX4KHQRQMJ"
+        };
+        
+        const ADMIN_EMAIL = "prajansanjayko@gmail.com";
+        const appId = firebaseConfig.projectId;
+
+        window.onload = async () => {
+            let app, db, auth;
+            let currentUserId = null;
+            let isAdmin = false;
+            let financeChart = null;
+
+            // DOM Elements Map
+            const els = {
+                doctorApp: document.getElementById('doctor-app'),
+                pages: {
+                    dashboard: document.getElementById('page-dashboard'),
+                    queue: document.getElementById('page-queue'),
+                    bookings: document.getElementById('page-bookings'),
+                    finance: document.getElementById('page-finance'),
+                    settings: document.getElementById('page-settings'),
+                    export: document.getElementById('page-export')
+                },
+                navBtns: {
+                    dashboard: document.getElementById('nav-dashboard'),
+                    queue: document.getElementById('nav-queue'),
+                    bookings: document.getElementById('nav-bookings'),
+                    finance: document.getElementById('nav-finance'),
+                    settings: document.getElementById('nav-settings'),
+                    export: document.getElementById('nav-export')
+                },
+                // Dashboard
+                waitingCount: document.getElementById('dashboard-waiting-count'),
+                seenCount: document.getElementById('dashboard-seen-count'),
+                revenue: document.getElementById('dashboard-revenue'),
+                upNext: document.getElementById('dashboard-up-next'), // Up Next Container
+                passcode: document.getElementById('dashboard-passcode'),
+                qrCanvas: document.getElementById('qr-code-canvas'),
+                apptList: document.getElementById('dashboard-appt-list'),
+                
+                // Queue
+                queueList: document.getElementById('queue-list'),
+                enRouteList: document.getElementById('enroute-list'),
+                
+                // Finance
+                financeTabs: {
+                    revenue: document.getElementById('finance-revenue-tab'),
+                    expenses: document.getElementById('finance-expenses-tab'),
+                    analytics: document.getElementById('finance-analytics-tab')
+                },
+                financeViews: {
+                    revenue: document.getElementById('finance-view-revenue'),
+                    expenses: document.getElementById('finance-view-expenses'),
+                    analytics: document.getElementById('finance-view-analytics')
+                },
+                expensesList: document.getElementById('expenses-list'),
+                expenseForm: document.getElementById('expense-form'),
+                
+                // Modals
+                notesModal: document.getElementById('notes-modal'),
+                priorityModal: document.getElementById('priority-modal'),
+                
+                // Action Elements
+                exportWeeklyBtn: document.getElementById('export-weekly-report-btn'),
+                exportMonthlyBtn: document.getElementById('export-monthly-report-btn'),
+                reportStatusMsg: document.getElementById('report-status-msg'),
+                priorityCallBtn: document.getElementById('priority-call-btn'),
+                priorityConfirmBtn: document.getElementById('priority-confirm-btn'),
+                priorityInput: document.getElementById('priority-input')
+            };
+
+            const unsubscribers = {
+                dashboard: null,
+                queue: null,
+                bookings: null,
+                finance: null,
+                settings: null
+            };
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await setPersistence(auth, browserLocalPersistence);
+            } catch (error) {
+                console.error("Firebase Init Error", error);
+                alert("Error initializing app.");
+                return;
+            }
+
+            // --- SHARED FUNCTION: Call Patient (OLD VERSION: Just Open Modal) ---
+            function callPatient(id, data) {
+                // Play sound but DO NOT update DB yet (wait for complete)
+                try { Tone.start(); } catch(e){}
+                showNotesModal(id, data);
+            }
+
+            // --- Navigation Logic ---
+            function switchPage(pageId) {
+                Object.values(els.pages).forEach(el => { if(el) el.style.display = 'none'; });
+                if(els.pages[pageId]) els.pages[pageId].style.display = 'block';
+
+                Object.values(els.navBtns).forEach(btn => btn?.classList.remove('nav-btn-active', 'bg-indigo-50', 'text-indigo-600'));
+                if(els.navBtns[pageId]) els.navBtns[pageId].classList.add('bg-indigo-50', 'text-indigo-600');
+
+                // Cleanup listeners
+                Object.values(unsubscribers).forEach(unsub => { if(unsub) unsub(); });
+
+                // Init Page Logic
+                if(pageId === 'dashboard') initDashboard();
+                if(pageId === 'queue') initQueue();
+                if(pageId === 'bookings') initBookings();
+                if(pageId === 'finance') initFinance();
+                if(pageId === 'settings') initSettings();
+                if(pageId === 'export') initExport();
+            }
+
+            // --- 1. Dashboard Logic ---
+            function initDashboard() {
+                const today = new Date(); today.setHours(0,0,0,0); 
+                const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+
+                // Queue Listener (Up Next)
+                const qWait = query(collection(db, `artifacts/${appId}/public/data/queue`), 
+                    where("status", "==", "waiting"),
+                    orderBy("joinedAt", "asc")
+                );
+                const unsubWait = onSnapshot(qWait, (snap) => {
+                    if(els.waitingCount) els.waitingCount.textContent = snap.size;
+                    
+                    // UPDATE "UP NEXT" CARD
+                    if(els.upNext) {
+                        if(snap.empty) {
+                            els.upNext.innerHTML = `<div class="flex h-full items-center justify-center text-gray-400 italic">No patients waiting</div>`;
+                        } else {
+                            const nextPatient = snap.docs[0].data();
+                            const nextId = snap.docs[0].id;
+                            els.upNext.innerHTML = `
+                                <div class="flex flex-col justify-between h-full animate-fade-in">
+                                    <div>
+                                        <span class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded uppercase">Next in Line</span>
+                                        <h2 class="text-3xl font-bold text-gray-800 mt-2">${nextPatient.name}</h2>
+                                        <p class="text-gray-500">${nextPatient.issue || 'No issue specified'}</p>
+                                        <p class="text-sm text-gray-400 mt-1">Mobile: ${nextPatient.mobile}</p>
+                                    </div>
+                                    <div class="mt-4">
+                                        <button id="dash-call-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                            CALL NOW
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                            // Bind the dynamic button
+                            document.getElementById('dash-call-btn').onclick = () => callPatient(nextId, nextPatient);
+                        }
+                    }
+                });
+
+                // Stats
+                const qSeen = query(collection(db, `artifacts/${appId}/public/data/queue`), where("status", "==", "seen"), where("completedAt", ">=", Timestamp.fromDate(today)), where("completedAt", "<", Timestamp.fromDate(tomorrow)));
+                const unsubSeen = onSnapshot(qSeen, (snap) => { 
+                    if(els.seenCount) els.seenCount.textContent = snap.size; 
+                    let total = 0; 
+                    snap.forEach(d => total += parseFloat(d.data().fee || 0)); 
+                    if(els.revenue) els.revenue.textContent = `₹${total}`; 
+                });
+
+                // Clinic Status (Passcode)
+                const docStatus = doc(db, `artifacts/${appId}/public/data/clinicStatus/status`);
+                const unsubStatus = onSnapshot(docStatus, (snap) => { 
+                    const data = snap.data() || {}; 
+                    const code = data.remotePasscode || 'ABCD'; 
+                    if(els.passcode) els.passcode.textContent = code; 
+                    if(els.qrCanvas) { 
+                        const pageUrl = window.location.href.replace('doctor.html', 'patient.html'); 
+                        new QRious({ element: els.qrCanvas, value: `${pageUrl}?pass=${code}`, size: 200 }); 
+                    } 
+                });
+
+                const dlBtn = document.getElementById('download-qr-pdf'); 
+                if(dlBtn) dlBtn.onclick = () => downloadQRPDF(els.passcode.textContent);
+
+                // Upcoming Appts
+                const qAppt = query(collectionGroup(db, "appointments"),
+                    where("appointmentAt", ">=", Timestamp.fromDate(today)),
+                    where("appointmentAt", "<", Timestamp.fromDate(tomorrow)),
+                    where("status", "==", "confirmed"),
+                    orderBy("appointmentAt", "asc"),
+                    limit(5));
+                const unsubAppt = onSnapshot(qAppt, (snap) => {
+                    if(els.apptList) els.apptList.innerHTML = '';
+                    if(snap.empty) els.apptList.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No appointments today.</p>';
+                    snap.forEach(d => {
+                        const val = d.data();
+                        const time = val.appointmentAt.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        els.apptList.innerHTML += `<div class="flex items-center py-3 border-b border-gray-100 last:border-0"><div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mr-3">${time}</div><div><p class="font-semibold text-gray-800 text-sm">${val.patientName}</p><p class="text-xs text-gray-500">${val.reason}</p></div></div>`;
+                    });
+                });
+
+                unsubscribers.dashboard = () => { unsubWait(); unsubSeen(); unsubStatus(); unsubAppt(); };
+            }
+
+            // --- 2. PDF Logic ---
+            function downloadQRPDF(passcode) {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                // Header
+                doc.setFontSize(22);
+                doc.setTextColor(79, 70, 229); // Indigo
+                doc.text("MediQue Clinic Check-In", 105, 30, null, null, "center");
+                
+                // Instructions
+                doc.setFontSize(12);
+                doc.setTextColor(50, 50, 50);
+                doc.text("Scan this code to join the queue", 105, 45, null, null, "center");
+                
+                // QR Image
+                const canvas = document.getElementById('qr-code-canvas');
+                if(canvas) {
+                    const imgData = canvas.toDataURL("image/png");
+                    doc.addImage(imgData, 'PNG', 55, 60, 100, 100);
+                }
+
+                // Passcode
+                doc.setFontSize(16);
+                doc.text("Or enter manually:", 105, 175, null, null, "center");
+                doc.setFontSize(30);
+                doc.setTextColor(0, 0, 0);
+                doc.text(passcode, 105, 190, null, null, "center");
+
+                doc.save(`clinic-qr-${passcode}.pdf`);
+            }
+
+            // --- 3. Finance Logic (Enhanced) ---
+            function initFinance() {
+                // Tab Switching
+                const tabs = ['revenue', 'expenses', 'analytics'];
+                tabs.forEach(t => {
+                    const btn = els.financeTabs[t];
+                    if(btn) {
+                        btn.onclick = () => {
+                            tabs.forEach(x => {
+                                els.financeTabs[x].classList.remove('text-indigo-600', 'border-indigo-600', 'border-b-2');
+                                els.financeViews[x].style.display = 'none';
+                            });
+                            btn.classList.add('text-indigo-600', 'border-indigo-600', 'border-b-2');
+                            els.financeViews[t].style.display = 'block';
+                            
+                            if(t === 'analytics') renderAnalyticsChart();
+                            if(t === 'revenue') loadRevenueStats(); // NEW: Load real revenue data
+                        };
+                    }
+                });
+
+                // Trigger initial revenue load
+                loadRevenueStats();
+
+                // Expenses Logic
+                const qExp = query(collection(db, `artifacts/${appId}/public/data/expenses`), orderBy("date", "desc"), limit(20));
+                unsubscribers.finance = onSnapshot(qExp, (snap) => {
+                    if(els.expensesList) els.expensesList.innerHTML = '';
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const date = data.date?.toDate().toLocaleDateString() || 'N/A';
+                        els.expensesList.innerHTML += `
+                            <div class="flex justify-between items-center p-3 border-b border-gray-100 last:border-0">
+                                <div>
+                                    <p class="font-bold text-gray-800">${data.category}</p>
+                                    <p class="text-xs text-gray-500">${data.description || ''} • ${date}</p>
+                                </div>
+                                <p class="font-bold text-red-600">-₹${data.amount}</p>
+                            </div>
+                        `;
+                    });
+                });
+
+                // Add Expense
+                if(els.expenseForm) {
+                    els.expenseForm.onsubmit = async (e) => {
+                        e.preventDefault();
+                        const cat = document.getElementById('ex-cat').value;
+                        const amt = parseFloat(document.getElementById('ex-amt').value);
+                        const desc = document.getElementById('ex-desc').value;
+                        
+                        await addDoc(collection(db, `artifacts/${appId}/public/data/expenses`), {
+                            category: cat,
+                            amount: amt,
+                            description: desc,
+                            date: serverTimestamp()
+                        });
+                        els.expenseForm.reset();
+                        alert("Expense Added");
+                    };
+                }
+            }
+
+            // NEW: Revenue Stats Loader (Updated to show details)
+            async function loadRevenueStats() {
+                const revenueView = document.getElementById('finance-view-revenue');
+                revenueView.innerHTML = '<div class="text-center py-10"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div><p class="mt-2 text-gray-500">Loading revenue data...</p></div>';
+
+                // Calculate ranges
+                const today = new Date(); today.setHours(0,0,0,0);
+                const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                const weekStart = new Date(today); weekStart.setDate(today.getDate() - 7);
+                const monthStart = new Date(today); monthStart.setDate(1); // Start of current month
+
+                try {
+                    // Fetch all 'seen' patients for this month (approx) to calc stats
+                    const q = query(collection(db, `artifacts/${appId}/public/data/queue`),
+                        where("status", "==", "seen"),
+                        where("completedAt", ">=", Timestamp.fromDate(monthStart))
+                    );
+                    
+                    const snap = await getDocs(q);
+                    let todayRev = 0, weekRev = 0, monthRev = 0, count = 0;
+                    let recentTxns = [];
+
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const date = data.completedAt.toDate();
+                        const fee = parseFloat(data.fee || 0);
+                        
+                        if (date >= today && date < tomorrow) todayRev += fee;
+                        if (date >= weekStart) weekRev += fee;
+                        monthRev += fee;
+                        count++;
+
+                        // Collect transaction
+                        recentTxns.push({
+                            date: date,
+                            patient: data.name || 'Unknown',
+                            fee: fee
+                        });
+                    });
+
+                    // Sort by date descending
+                    recentTxns.sort((a, b) => b.date - a.date);
+
+                    // Generate rows
+                    let rowsHtml = '';
+                    if(recentTxns.length === 0) {
+                        rowsHtml = '<tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">No transactions yet this month.</td></tr>';
+                    } else {
+                        recentTxns.slice(0, 15).forEach(txn => {
+                            rowsHtml += `
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${txn.date.toLocaleDateString()}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${txn.patient}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-emerald-600">₹${txn.fee}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+
+                    revenueView.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="glass-card p-6 bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+                                <p class="text-sm font-bold text-emerald-600 uppercase tracking-wide">Today's Revenue</p>
+                                <h3 class="text-3xl font-extrabold text-gray-900 mt-2">₹${todayRev}</h3>
+                            </div>
+                            <div class="glass-card p-6 bg-gradient-to-br from-blue-50 to-white border-blue-100">
+                                <p class="text-sm font-bold text-blue-600 uppercase tracking-wide">This Week</p>
+                                <h3 class="text-3xl font-extrabold text-gray-900 mt-2">₹${weekRev}</h3>
+                            </div>
+                            <div class="glass-card p-6 bg-gradient-to-br from-purple-50 to-white border-purple-100">
+                                <p class="text-sm font-bold text-purple-600 uppercase tracking-wide">This Month</p>
+                                <h3 class="text-3xl font-extrabold text-gray-900 mt-2">₹${monthRev}</h3>
+                            </div>
+                        </div>
+                        <div class="glass-card p-6">
+                            <h3 class="font-bold text-lg mb-4 text-gray-800">Recent Transactions</h3>
+                            <div class="overflow-hidden rounded-xl border border-gray-200">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Fee</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        ${rowsHtml}
+                                    </tbody>
+                                </table>
+                                <div class="px-6 py-4 bg-gray-50 text-right text-sm text-gray-500">
+                                    Total ${count} visits this month
+                                </div>
+                            </div>
+                        </div>
+                    `;
+
+                } catch (e) {
+                    console.error("Rev Error", e);
+                    revenueView.innerHTML = '<p class="text-red-500 text-center py-10">Error loading revenue data.</p>';
+                }
+            }
+
+            async function renderAnalyticsChart() {
+                const ctx = document.getElementById('finance-chart').getContext('2d');
+                if(financeChart) financeChart.destroy();
+
+                // Fetch last 7 days data
+                const end = new Date();
+                const start = new Date();
+                start.setDate(start.getDate() - 7);
+                
+                // 1. Fetch Revenue
+                const qRev = query(collection(db, `artifacts/${appId}/public/data/queue`), 
+                    where("completedAt", ">=", Timestamp.fromDate(start)),
+                    where("status", "==", "seen"));
+                const revSnap = await getDocs(qRev);
+                
+                // 2. Fetch Expenses
+                const qExp = query(collection(db, `artifacts/${appId}/public/data/expenses`),
+                    where("date", ">=", Timestamp.fromDate(start)));
+                const expSnap = await getDocs(qExp);
+
+                // Process Data
+                const labels = [];
+                const revData = new Array(7).fill(0);
+                const expData = new Array(7).fill(0);
+
+                for(let i=6; i>=0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    labels.push(d.toLocaleDateString('en-US', {weekday:'short'}));
+                }
+
+                revSnap.forEach(d => {
+                    const data = d.data();
+                    const dayDiff = Math.floor((new Date() - data.completedAt.toDate()) / (1000 * 60 * 60 * 24));
+                    if(dayDiff < 7) revData[6-dayDiff] += parseFloat(data.fee || 0);
+                });
+
+                expSnap.forEach(d => {
+                    const data = d.data();
+                    const dayDiff = Math.floor((new Date() - data.date.toDate()) / (1000 * 60 * 60 * 24));
+                    if(dayDiff < 7) expData[6-dayDiff] += parseFloat(data.amount || 0);
+                });
+
+                financeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: 'Revenue', data: revData, backgroundColor: '#4f46e5', borderRadius: 5 },
+                            { label: 'Expenses', data: expData, backgroundColor: '#ef4444', borderRadius: 5 }
+                        ]
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false, // Fix: Prevent huge chart
+                        plugins: { legend: { position: 'bottom' } } 
+                    }
+                });
+            }
+
+            // --- 4. Queue Logic ---
+            function initQueue() {
+                const q = query(collection(db, `artifacts/${appId}/public/data/queue`), 
+                    where("status", "in", ["waiting", "pre_registered"]), 
+                    orderBy("joinedAt", "asc"));
+                
+                unsubscribers.queue = onSnapshot(q, (snap) => {
+                    els.queueList.innerHTML = '';
+                    els.enRouteList.innerHTML = '';
+                    
+                    snap.forEach(d => {
+                        const data = d.data();
+                        const id = d.id;
+                        
+                        const item = document.createElement('div');
+                        item.className = "bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center mb-3 animate-fade-in";
+                        item.innerHTML = `
+                            <div>
+                                <h4 class="font-bold text-gray-800">${data.name}</h4>
+                                <p class="text-sm text-gray-500">${data.mobile} • ${data.issue || 'No Issue'}</p>
+                            </div>
+                        `;
+
+                        const actionBtn = document.createElement('button');
+                        actionBtn.className = "px-4 py-2 rounded-lg text-sm font-semibold transition-colors";
+                        
+                        if(data.status === 'waiting') {
+                            actionBtn.textContent = "Call & Treat";
+                            actionBtn.className += " bg-emerald-600 text-white hover:bg-emerald-700";
+                            // REVERTED TO ORIGINAL: Calls patient individually without extra DB write
+                            actionBtn.onclick = () => callPatient(id, data);
+                            item.appendChild(actionBtn);
+                            els.queueList.appendChild(item);
+                        } else {
+                            actionBtn.textContent = "Mark Arrived";
+                            actionBtn.className += " bg-purple-600 text-white hover:bg-purple-700";
+                            actionBtn.onclick = async () => {
+                                await updateDoc(doc(db, `artifacts/${appId}/public/data/queue`, id), {
+                                    status: 'waiting',
+                                    joinedAt: serverTimestamp()
+                                });
+                            };
+                            item.appendChild(actionBtn);
+                            els.enRouteList.appendChild(item);
+                        }
+                    });
+                });
+            }
+
+            // --- 5. Bookings Logic (Approve/Decline) ---
+            function initBookings(customDate = null) {
+               const list = document.getElementById('bookings-list');
+               
+               if (!list) return;
+
+               // Query all appointments
+               const q = query(collectionGroup(db, "appointments"), 
+                    orderBy("appointmentAt", "desc"),
+                    limit(20)
+               );
+               
+               unsubscribers.bookings = onSnapshot(q, (snap) => {
+                   list.innerHTML = '';
+                   if(snap.empty) {
+                       list.innerHTML = '<p class="text-center text-gray-400 col-span-full py-10">No recent appointments.</p>';
+                       return;
+                   }
+
+                   snap.forEach(d => {
+                       const data = d.data();
+                       const div = document.createElement('div');
+                       div.className = "glass-card p-4 mb-4 flex justify-between items-center";
+                       const time = data.appointmentAt?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'N/A';
+                       const date = data.appointmentAt?.toDate().toLocaleDateString() || 'N/A';
+                       let statusColor = data.status === 'pending' ? 'text-yellow-600' : (data.status === 'confirmed' ? 'text-green-600' : 'text-red-600');
+                       
+                       div.innerHTML = `
+                           <div>
+                               <p class="font-bold text-lg">${data.patientName}</p>
+                               <p class="text-sm text-gray-500">${date} ${time} • ${data.reason || 'Checkup'}</p>
+                               <p class="text-xs font-bold uppercase mt-1 ${statusColor}">${data.status}</p>
+                           </div>
+                           <div class="flex gap-2">
+                               ${data.status === 'pending' ? `
+                               <button class="bg-green-100 text-green-700 px-3 py-1 rounded text-sm font-medium hover:bg-green-200" id="btn-acc-${d.id}">Accept</button>
+                               <button class="bg-red-100 text-red-700 px-3 py-1 rounded text-sm font-medium hover:bg-red-200" id="btn-dec-${d.id}">Decline</button>
+                               ` : ''}
+                           </div>
+                       `;
+                       list.appendChild(div);
+                       
+                       if(data.status === 'pending') {
+                           const btnAcc = document.getElementById(`btn-acc-${d.id}`);
+                           const btnDec = document.getElementById(`btn-dec-${d.id}`);
+                           if(btnAcc) btnAcc.onclick = async () => await updateDoc(d.ref, {status: 'confirmed'});
+                           if(btnDec) btnDec.onclick = async () => await updateDoc(d.ref, {status: 'declined'});
+                       }
+                   });
+               });
+            }
+
+            // --- 6. Export Logic (NEW: PDF + AI Insight) ---
+            function initExport() {
+                const weeklyBtn = document.getElementById('export-weekly-report-btn');
+                const monthlyBtn = document.getElementById('export-monthly-report-btn');
+                
+                if (weeklyBtn) weeklyBtn.onclick = () => generateFinancialReport('weekly');
+                if (monthlyBtn) monthlyBtn.onclick = () => generateFinancialReport('monthly');
+            }
+
+            async function generateFinancialReport(type) {
+                const statusMsg = document.getElementById('report-status-msg');
+                if(statusMsg) {
+                    statusMsg.textContent = "Generating Report... (Analyzing Data)";
+                    statusMsg.className = "text-indigo-600 animate-pulse";
+                }
+
+                try {
+                    const today = new Date();
+                    const endDate = new Date(today);
+                    const startDate = new Date(today);
+                    
+                    if (type === 'weekly') {
+                        startDate.setDate(today.getDate() - 7);
+                    } else {
+                        startDate.setDate(today.getDate() - 30);
+                    }
+
+                    // 1. Fetch Data
+                    const qRev = query(collection(db, `artifacts/${appId}/public/data/queue`), 
+                        where("completedAt", ">=", Timestamp.fromDate(startDate)),
+                        where("status", "==", "seen"));
+                    const revSnap = await getDocs(qRev);
+                    
+                    let totalRev = 0;
+                    let visits = 0;
+                    let revenueByDay = {}; // For graph
+
+                    revSnap.forEach(d => {
+                        const data = d.data();
+                        const fee = parseFloat(data.fee || 0);
+                        totalRev += fee;
+                        visits++;
+                        const day = data.completedAt.toDate().toLocaleDateString();
+                        revenueByDay[day] = (revenueByDay[day] || 0) + fee;
+                    });
+
+                    // 2. Simple "AI" Insight Generator (Rule-based)
+                    let aiSummary = "";
+                    if (visits === 0) {
+                        aiSummary = "No visits were recorded in this period. Consider promotional activities.";
+                    } else {
+                        const avgFee = (totalRev / visits).toFixed(2);
+                        const sortedDays = Object.entries(revenueByDay).sort((a,b) => b[1] - a[1]);
+                        const bestDay = sortedDays[0];
+                        
+                        aiSummary = `The clinic generated ₹${totalRev} from ${visits} patient visits. The average revenue per patient was ₹${avgFee}. `;
+                        aiSummary += `Your best performing day was ${bestDay[0]} with ₹${bestDay[1]}. `;
+                        
+                        if (visits > 50) aiSummary += "Traffic is high; consider opening more slots. ";
+                        else if (visits < 10) aiSummary += "Patient volume is low. ";
+                    }
+
+                    // 3. Generate PDF using jsPDF
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+
+                    // Header
+                    doc.setFontSize(22);
+                    doc.setTextColor(79, 70, 229);
+                    doc.text("MediQue Financial Report", 105, 20, null, null, "center");
+                    
+                    doc.setFontSize(12);
+                    doc.setTextColor(100);
+                    doc.text(`Period: ${type.toUpperCase()} (${startDate.toLocaleDateString()} - ${today.toLocaleDateString()})`, 105, 30, null, null, "center");
+
+                    // Summary Box
+                    doc.setFillColor(243, 244, 246);
+                    doc.roundedRect(15, 40, 180, 25, 3, 3, 'F');
+                    doc.setFontSize(14);
+                    doc.setTextColor(0);
+                    doc.text(`Total Revenue: ₹${totalRev}`, 25, 50);
+                    doc.text(`Total Visits: ${visits}`, 120, 50);
+                    
+                    // AI Section
+                    doc.setFontSize(12);
+                    doc.setTextColor(79, 70, 229);
+                    doc.text("AI Generated Insights:", 15, 75);
+                    doc.setFontSize(10);
+                    doc.setTextColor(50);
+                    const splitText = doc.splitTextToSize(aiSummary, 180);
+                    doc.text(splitText, 15, 82);
+
+                    // Add Table (Transactions) using AutoTable
+                    let tableData = [];
+                    revSnap.forEach(d => {
+                        const data = d.data();
+                        tableData.push([
+                            data.completedAt.toDate().toLocaleDateString(),
+                            data.name || 'Unknown',
+                            `₹${data.fee || 0}`
+                        ]);
+                    });
+
+                    doc.autoTable({
+                        startY: 100,
+                        head: [['Date', 'Patient Name', 'Fee']],
+                        body: tableData,
+                        theme: 'grid',
+                        headStyles: { fillColor: [79, 70, 229] }
+                    });
+
+                    // Save
+                    doc.save(`medique_report_${type}_${today.toISOString().split('T')[0]}.pdf`);
+
+                    if(statusMsg) {
+                        statusMsg.textContent = "Report Downloaded Successfully!";
+                        statusMsg.className = "text-green-600";
+                    }
+
+                } catch (e) {
+                    console.error("Report Error", e);
+                    if(statusMsg) {
+                        statusMsg.textContent = "Error generating report. Check console.";
+                        statusMsg.className = "text-red-600";
+                    }
+                }
+            }
+            
+            // --- 7. Settings ---
+            function initSettings() {
+                const docRef = doc(db, `artifacts/${appId}/public/data/clinicSettings/settings`);
+                getDoc(docRef).then(snap => {
+                   if(snap.exists()) {
+                       const d = snap.data();
+                       if(document.getElementById('set-lat')) document.getElementById('set-lat').value = d.latitude || '';
+                       if(document.getElementById('set-lon')) document.getElementById('set-lon').value = d.longitude || '';
+                   } 
+                });
+                
+                const saveBtn = document.getElementById('save-settings-btn');
+                if(saveBtn) saveBtn.onclick = async () => {
+                     const lat = parseFloat(document.getElementById('set-lat').value);
+                     const lon = parseFloat(document.getElementById('set-lon').value);
+                     await setDoc(docRef, { latitude: lat, longitude: lon, updatedAt: serverTimestamp() }, { merge: true });
+                     alert("Settings Saved");
+                };
+
+                const passBtn = document.getElementById('save-passcode-btn');
+                if(passBtn) passBtn.onclick = async () => {
+                    const code = document.getElementById('set-passcode').value;
+                    if(code) {
+                         await setDoc(doc(db, `artifacts/${appId}/public/data/clinicStatus/status`), { remotePasscode: code.toUpperCase() }, { merge: true });
+                         alert("Passcode Updated");
+                    }
+                };
+            }
+
+            // --- 8. Modals & Priority Logic ---
+            let currentPatientId = null;
+            let currentPatientData = null;
+
+            // Priority Call Logic
+            if(els.priorityCallBtn) els.priorityCallBtn.onclick = () => els.priorityModal.style.display = 'flex';
+            document.getElementById('close-priority-modal').onclick = () => els.priorityModal.style.display = 'none';
+            
+            if(els.priorityConfirmBtn) els.priorityConfirmBtn.onclick = async () => {
+                const val = els.priorityInput.value.trim().toLowerCase();
+                if(!val) return alert("Please enter a name.");
+                const q = query(collection(db, `artifacts/${appId}/public/data/queue`), where("status", "in", ["waiting", "pre_registered"]));
+                const snap = await getDocs(q);
+                let found = null, foundId = null;
+                snap.forEach(d => { if(d.data().name.toLowerCase().includes(val)) { found=d.data(); foundId=d.id; } });
+                if(found) { 
+                    els.priorityModal.style.display='none'; 
+                    els.priorityInput.value=''; 
+                    callPatient(foundId, found); // Call immediately
+                } else { 
+                    alert("Patient not found in queue."); 
+                }
+            };
+
+            async function showNotesModal(docId, data) {
+                currentPatientId = docId;
+                currentPatientData = data;
+                document.getElementById('modal-patient-name').textContent = data.name;
+                document.getElementById('next-visit-date').value = ''; // Reset date
+                els.notesModal.style.display = 'flex';
+                
+                // Fetch Previous History for this patient
+                const historyList = document.getElementById('patient-history-list');
+                historyList.innerHTML = '<div class="text-center py-4"><div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"></div></div>';
+                
+                try {
+                    const qHistory = query(collection(db, `artifacts/${appId}/users/${data.patientId}/visits`), orderBy('visitedAt', 'desc'), limit(5));
+                    const snap = await getDocs(qHistory);
+                    
+                    if (snap.empty) {
+                        historyList.innerHTML = '<p class="text-gray-400 text-center py-2 text-sm">No previous visits found.</p>';
+                    } else {
+                        historyList.innerHTML = '';
+                        snap.forEach(doc => {
+                            const h = doc.data();
+                            const date = h.visitedAt?.toDate().toLocaleDateString() || 'Unknown';
+                            historyList.innerHTML += `
+                                <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-2 text-sm">
+                                    <div class="flex justify-between font-bold text-gray-700">
+                                        <span>${date}</span>
+                                        <span class="text-emerald-600">₹${h.fee}</span>
+                                    </div>
+                                    <p class="text-gray-600 mt-1">${h.notes}</p>
+                                </div>
+                            `;
+                        });
+                    }
+                } catch (e) {
+                    console.error("History fetch error", e);
+                    historyList.innerHTML = '<p class="text-red-400 text-center py-2 text-sm">Error loading history.</p>';
+                }
+            }
+
+            const closeBtn = document.getElementById('close-notes-modal');
+            if(closeBtn) closeBtn.onclick = () => els.notesModal.style.display = 'none';
+            
+            const notesForm = document.getElementById('notes-form');
+            if(notesForm) notesForm.onsubmit = async (e) => {
+                e.preventDefault();
+                const notes = document.getElementById('visit-notes').value;
+                const fee = parseFloat(document.getElementById('visit-fee').value);
+                const nextVisit = document.getElementById('next-visit-date').value; // Get next visit date
+                
+                if(!currentPatientId) return;
+                
+                // REVERTED: Generate Simple PDF Prescription (No complicated layout)
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.setFontSize(20); doc.setTextColor(79, 70, 229);
+                    doc.text("MediQue Prescription", 105, 20, null, null, "center");
+                    doc.setFontSize(12); doc.setTextColor(0);
+                    doc.text(`Patient: ${currentPatientData.name}`, 15, 40);
+                    doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 40);
+                    
+                    doc.text("Rx:", 15, 55);
+                    doc.setFontSize(10);
+                    doc.text(doc.splitTextToSize(notes, 180), 15, 65);
+                    
+                    if(nextVisit) {
+                        doc.setFontSize(12); doc.setTextColor(220, 38, 38);
+                        doc.text(`Next Visit: ${nextVisit}`, 15, 120);
+                    }
+                    doc.save(`Rx_${currentPatientData.name}.pdf`);
+                } catch(e) { console.error("PDF Error", e); }
+
+                // Save to DB
+                try {
+                    const queueDocRef = doc(db, `artifacts/${appId}/public/data/queue`, currentPatientId);
+                    const queueSnap = await getDoc(queueDocRef);
+                    let duration = 10; // Default duration
+
+                    if (queueSnap.exists() && queueSnap.data().consultationStartedAt) {
+                        const start = queueSnap.data().consultationStartedAt.toDate();
+                        const end = new Date();
+                        duration = Math.round((end - start) / 1000 / 60);
+                        if(duration < 1) duration = 1;
+                    }
+
+                    await addDoc(collection(db, `artifacts/${appId}/users/${currentPatientData.patientId}/visits`), {
+                        visitedAt: serverTimestamp(),
+                        notes: notes,
+                        fee: fee,
+                        duration: duration,
+                        nextVisitDate: nextVisit ? Timestamp.fromDate(new Date(nextVisit)) : null,
+                        clinicId: appId,
+                        doctor: "Dr. Admin"
+                    });
+
+                    await updateDoc(queueDocRef, {
+                        status: 'seen',
+                        completedAt: serverTimestamp(),
+                        fee: fee,
+                        duration: duration,
+                        notes: notes
+                    });
+
+                } catch (err) {
+                    console.error("Error completing visit:", err);
+                    alert("Error saving data. Check console.");
+                } finally {
+                    // CRITICAL FIX: Always close modal
+                    els.notesModal.style.display = 'none';
+                    notesForm.reset();
+                }
+            };
+            
+            // Auth
+            const logoutBtn = document.getElementById('logout-btn');
+            if(logoutBtn) logoutBtn.onclick = () => signOut(auth);
+            
+            onAuthStateChanged(auth, (user) => {
+                if (user && user.email === ADMIN_EMAIL) {
+                    currentUserId = user.uid;
+                    isAdmin = true;
+                    if(els.doctorApp) els.doctorApp.style.display = 'block';
+                    switchPage('dashboard');
+                } else {
+                     try { window.location.href = 'index.html'; } catch(e) {}
+                }
+            });
+
+            // Listeners
+            Object.keys(els.navBtns).forEach(key => {
+                els.navBtns[key]?.addEventListener('click', () => switchPage(key));
+            });
+        };
+    </script>
+</head>
+<body class="text-gray-800 antialiased">
+
+    <nav class="hidden md:flex glass-nav fixed top-0 w-full z-50 px-6 lg:px-8 h-16 items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">M</div>
+            <span class="text-xl font-bold tracking-tight text-gray-900">MediQue <span class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded ml-1">DOCTOR</span></span>
+        </div>
+        <div class="flex items-center gap-1">
+            <button id="nav-dashboard" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all">Dashboard</button>
+            <button id="nav-queue" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all">Queue</button>
+            <button id="nav-bookings" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all">Bookings</button>
+            <button id="nav-finance" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all">Finance</button>
+            <button id="nav-settings" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all">Settings</button>
+            <button id="nav-export" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all">Export</button>
+        </div>
+        <button id="logout-btn" class="flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            <span class="hidden sm:inline">Logout</span>
+        </button>
+    </nav>
+    
+    <main id="doctor-app" class="pt-6 pb-24 md:pt-24 md:pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto" style="display: none;">
+        
+        <!-- PAGE: DASHBOARD -->
+        <div id="page-dashboard" class="animate-fade-in">
+            <div class="mb-6 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 md:text-3xl">Dashboard</h1>
+                    <p class="text-gray-500 text-sm">Clinic Overview.</p>
+                </div>
+                <!-- Priority Call Button -->
+                <button id="priority-call-btn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow-md flex items-center gap-2 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    Priority Call
+                </button>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="glass-card p-6">
+                    <p class="text-sm font-medium text-gray-500">Waiting Room</p>
+                    <h3 id="dashboard-waiting-count" class="text-3xl font-bold text-gray-900 mt-1">0</h3>
+                </div>
+                <div class="glass-card p-6">
+                    <p class="text-sm font-medium text-gray-500">Completed</p>
+                    <h3 id="dashboard-seen-count" class="text-3xl font-bold text-gray-900 mt-1">0</h3>
+                </div>
+                <div class="glass-card p-6">
+                    <p class="text-sm font-medium text-gray-500">Revenue</p>
+                    <h3 id="dashboard-revenue" class="text-3xl font-bold text-gray-900 mt-1">₹0</h3>
+                </div>
+            </div>
+
+            <!-- Up Next & Passcode -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="lg:col-span-2 glass-card p-6">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Up Next</h3>
+                    <div id="dashboard-up-next" class="bg-gray-50 rounded-xl border border-gray-200 h-40 flex items-center justify-center text-gray-400">
+                         Loading...
+                    </div>
+                </div>
+                <div class="glass-card-dark p-6">
+                    <h3 class="text-lg font-bold mb-4">Passcode</h3>
+                    <div class="flex items-center justify-between bg-white/10 p-3 rounded-lg">
+                        <span id="dashboard-passcode" class="text-2xl font-mono font-bold tracking-widest text-white">...</span>
+                        <canvas id="qr-code-canvas" class="w-14 h-14 rounded bg-white"></canvas>
+                    </div>
+                    <button id="download-qr-pdf" class="mt-4 w-full py-2 bg-white/20 rounded text-sm">Download QR PDF</button>
+                </div>
+            </div>
+
+            <!-- Recent Appts -->
+            <div class="glass-card p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Upcoming Appointments</h3>
+                <div id="dashboard-appt-list"></div>
+            </div>
+        </div>
+
+        <!-- PAGE: QUEUE -->
+        <div id="page-queue" class="hidden animate-fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-bold text-gray-800 mb-3">Waiting In-Clinic</h3>
+                    <div id="queue-list" class="space-y-2"></div>
+                </div>
+                <div>
+                    <h3 class="font-bold text-gray-800 mb-3">En Route (Pre-registered)</h3>
+                    <div id="enroute-list" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: BOOKINGS -->
+        <div id="page-bookings" class="hidden animate-fade-in">
+             <div id="bookings-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- PAGE: FINANCE -->
+        <div id="page-finance" class="hidden animate-fade-in">
+            <div class="flex space-x-4 mb-6 border-b border-gray-200">
+                <button id="finance-revenue-tab" class="px-4 py-2 font-medium text-indigo-600 border-b-2 border-indigo-600">Revenue</button>
+                <button id="finance-expenses-tab" class="px-4 py-2 font-medium text-gray-500 hover:text-indigo-600">Expenses</button>
+                <button id="finance-analytics-tab" class="px-4 py-2 font-medium text-gray-500 hover:text-indigo-600">Analytics</button>
+            </div>
+            <div id="finance-view-revenue"></div>
+            <div id="finance-view-expenses" class="hidden">
+                <div class="glass-card p-6 mb-6">
+                    <h3 class="font-bold text-lg mb-4">Add Expense</h3>
+                    <form id="expense-form" class="space-y-4">
+                        <input type="text" id="ex-cat" placeholder="Category (e.g. Rent)" class="w-full p-2 border rounded" required>
+                        <input type="number" id="ex-amt" placeholder="Amount (₹)" class="w-full p-2 border rounded" required>
+                        <button type="submit" class="w-full bg-red-600 text-white py-2 rounded font-bold">Add Expense</button>
+                    </form>
+                </div>
+                <div id="expenses-list" class="space-y-2"></div>
+            </div>
+            <div id="finance-view-analytics" class="hidden">
+                <div class="glass-card p-6">
+                    <canvas id="finance-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: SETTINGS -->
+        <div id="page-settings" class="hidden animate-fade-in">
+            <div class="max-w-xl mx-auto glass-card p-6 space-y-4">
+                <h3 class="text-lg font-bold">Clinic Settings</h3>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Location</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="set-lat" class="w-1/2 p-2 border rounded" placeholder="Lat">
+                        <input type="text" id="set-lon" class="w-1/2 p-2 border rounded" placeholder="Lon">
+                    </div>
+                    <button id="save-settings-btn" class="mt-2 w-full bg-indigo-600 text-white py-2 rounded font-medium">Save Location</button>
+                </div>
+                <div class="pt-4 border-t">
+                    <label class="block text-sm font-medium mb-1">Daily Passcode</label>
+                    <input type="text" id="set-passcode" class="w-full p-2 border rounded uppercase" placeholder="ABCD">
+                    <button id="save-passcode-btn" class="mt-2 w-full bg-gray-800 text-white py-2 rounded font-medium">Update Passcode</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAGE: EXPORT -->
+        <div id="page-export" class="hidden animate-fade-in">
+            <div class="max-w-xl mx-auto glass-card p-8 text-center">
+                <h3 class="text-xl font-bold mb-4">Financial Reports</h3>
+                <p class="text-gray-500 mb-6">Download detailed PDF reports with AI-generated insights.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="export-weekly-report-btn" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold shadow hover:bg-blue-700 transition">Weekly PDF</button>
+                    <button id="export-monthly-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition">Monthly PDF</button>
+                </div>
+                <p id="report-status-msg" class="mt-4 text-sm font-medium text-gray-600"></p>
+            </div>
+        </div>
+
+    </main>
+    
+    <!-- Priority Modal -->
+    <div id="priority-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl animate-fade-in">
+            <h3 class="text-lg font-bold text-gray-900 mb-4">Priority Call</h3>
+            <p class="text-gray-500 text-sm mb-4">Enter patient name to call them immediately.</p>
+            <input type="text" id="priority-input" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Patient Name...">
+            <div class="flex justify-end gap-2">
+                <button id="close-priority-modal" class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
+                <button id="priority-confirm-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Call Now</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes Modal -->
+    <div id="notes-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl w-full max-w-lg flex flex-col max-h-[90vh] shadow-2xl">
+            <div class="bg-indigo-600 p-4 text-white flex justify-between items-center rounded-t-xl">
+                <h3 class="font-bold">Visit Details: <span id="modal-patient-name"></span></h3>
+                <button id="close-notes-modal" class="hover:text-gray-200 text-2xl font-bold">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto custom-scrollbar">
+                <div id="patient-history-list" class="mb-4 space-y-2"></div>
+                <form id="notes-form" class="space-y-4 border-t pt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Diagnosis / Notes</label>
+                        <textarea id="visit-notes" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter clinical notes..." rows="4" required></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fee (₹)</label>
+                            <input id="visit-fee" type="number" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="0.00" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Next Visit (Optional)</label>
+                            <input id="next-visit-date" type="date" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-600">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Complete & Print PDF</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

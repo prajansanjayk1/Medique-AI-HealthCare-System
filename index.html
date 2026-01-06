@@ -3,29 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#3b82f6" />
+    <meta name="theme-color" content="#4f46e5" />
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192x192.png">
     <title>MediQue - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f3f4f6;
+            background-image: 
+                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
-        body {
-            background: linear-gradient(to bottom right, #f8fafc, #e0e7ff);
-        }
+        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        
         input {
             font-size: 16px !important;
+            transition: all 0.2s ease;
         }
+        input:focus {
+            transform: translateY(-1px);
+        }
+        
         button {
             -webkit-tap-highlight-color: transparent;
             user-select: none;
             -webkit-user-select: none;
         }
+        
+        /* Custom scrollbar for aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* === MOBILE-FIRST OPTIMIZATIONS === */
+        /* Safe area for notched phones */
+        .pt-safe { padding-top: env(safe-area-inset-top, 0); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+        
+        /* Touch-friendly sizing */
+        button, .btn {
+            min-height: 48px;
+            min-width: 48px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        @media (max-width: 768px) {
+            /* Full-screen login on mobile */
+            .glass-panel {
+                margin: 1rem;
+                max-width: calc(100vw - 2rem);
+                padding: 1.5rem !important;
+            }
+            
+            /* Larger touch targets */
+            button, input {
+                min-height: 52px;
+                font-size: 16px !important;
+            }
+            
+            /* Full-width buttons */
+            button {
+                width: 100%;
+                padding: 14px 20px;
+            }
+            
+            /* Better input spacing */
+            input {
+                padding: 14px 16px;
+                margin-bottom: 0.75rem;
+            }
+            
+            /* Adjust logo sizing */
+            .text-5xl { font-size: 2.5rem !important; }
+        }
+        
+        /* Small phone */
+        @media (max-width: 375px) {
+            .glass-panel {
+                margin: 0.5rem;
+                padding: 1rem !important;
+            }
+            
+            .text-3xl { font-size: 1.5rem !important; }
+        }
     </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script type="module">
         // Firebase Imports
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -37,20 +128,25 @@
             signInWithEmailAndPassword,
             createUserWithEmailAndPassword,
             updateProfile,
-            sendPasswordResetEmail
+            sendPasswordResetEmail,
+            GoogleAuthProvider,
+            signInWithCredential
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
         // --- App Configuration ---
         const firebaseConfig = {
-          apiKey: "AIzaSyDqdSzRr29kDUH-eDwXTSg_dImTOqyYCiU",
-          authDomain: "main-8c336.firebaseapp.com",
-          projectId: "main-8c336",
-          storageBucket: "main-8c336.firebasestorage.app",
-          messagingSenderId: "507656529909",
-          appId: "1:507656529909:web:ccea008f4a1178bf0da2bc",
-          measurementId: "G-RX4KHQRQMJ"
+          apiKey: "AIzaSyAlLK95wyvpQ-AM4ybrzldy0GIjljL79Kw",
+          authDomain: "aishwaryam-acu.firebaseapp.com",
+          projectId: "aishwaryam-acu",
+          storageBucket: "aishwaryam-acu.firebasestorage.app",
+          messagingSenderId: "465782673272",
+          appId: "1:465782673272:web:d8daadbe2f6b7308bec28d",
+          measurementId: "G-00XFE2VC97"
         };
-        const ADMIN_EMAIL = "prajansanjayko@gmail.com";
+        const ADMIN_EMAIL = "v.kethari@gmail.com";
+        
+        // Placeholder for Google Client ID
+        const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com"; 
 
         window.onload = async () => {
             // --- PWA Service Worker Registration ---
@@ -100,11 +196,42 @@
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 await setPersistence(auth, browserLocalPersistence);
+                
+                // --- Initialize Google One Tap ---
+                if (window.google && GOOGLE_CLIENT_ID.includes("YOUR_")) {
+                    console.warn("Google Client ID is missing. One Tap will not load.");
+                } else if (window.google) {
+                    google.accounts.id.initialize({
+                        client_id: GOOGLE_CLIENT_ID,
+                        callback: handleCredentialResponse,
+                        auto_select: false,
+                        cancel_on_tap_outside: false
+                    });
+                    google.accounts.id.prompt((notification) => {
+                        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                            console.log("One Tap skipped/not displayed:", notification.getNotDisplayedReason());
+                        }
+                    });
+                }
+
             } catch (error) {
                 console.error("Firebase Init Error:", error);
                 showError("Error initializing app. Please refresh.");
                 return;
             }
+            
+            // Handle Google One Tap Response via Firebase
+            async function handleCredentialResponse(response) {
+                try {
+                    const credential = GoogleAuthProvider.credential(response.credential);
+                    await signInWithCredential(auth, credential);
+                    // onAuthStateChanged will handle redirect
+                } catch (error) {
+                    console.error("Google Sign-In Error:", error);
+                    showError("Google Sign-In failed: " + error.message);
+                }
+            }
+
 
             // --- Auth Guard ---
             onAuthStateChanged(auth, (user) => {
@@ -173,7 +300,7 @@
                 } else {
                     button.disabled = false;
                     // Reset button text based on ID
-                    if (button.id === 'login-btn') button.textContent = 'Login';
+                    if (button.id === 'login-btn') button.textContent = 'Sign In';
                     if (button.id === 'register-btn') button.textContent = 'Create Account';
                     if (button.id === 'reset-btn') button.textContent = 'Send Reset Link';
                 }
@@ -250,97 +377,121 @@
         };
     </script>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body class="flex items-center justify-center min-h-screen p-4 sm:p-6">
 
-    <div class="w-full max-w-md">
+    <div class="w-full max-w-[420px] relative z-10">
         <!-- Logo and Title -->
-        <div class="flex flex-col items-center mb-6">
-            <img class="h-16 w-auto" src="/logo.jpg" alt="MediQueue Logo" onerror="this.src='https://placehold.co/100x100/3b82f6/FFFFFF?text=MQ'">
-            <h1 class="text-4xl font-bold text-gray-800 mt-4">MediQueue</h1>
+        <div class="flex flex-col items-center mb-8 animate-fade-in">
+            <div class="bg-white p-3 rounded-2xl shadow-lg mb-4">
+                <img class="h-12 w-auto" src="/logo.png" alt="MediQue Logo" onerror="this.src='https://placehold.co/100x100/4f46e5/FFFFFF?text=MQ'">
+            </div>
+            <h1 class="text-3xl font-bold text-white tracking-tight">MediQue</h1>
+            <p class="text-blue-100 mt-2 text-center text-sm font-medium opacity-90">Smart Queue Management System</p>
         </div>
 
         <!-- Success/Error Messages -->
-        <div id="error-msg" class="hidden p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg animate-fade-in" role="alert">
+        <div id="error-msg" class="hidden p-4 mb-6 text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl shadow-sm animate-fade-in" role="alert">
             Error message goes here.
         </div>
-        <div id="success-msg" class="hidden p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg animate-fade-in" role="alert">
+        <div id="success-msg" class="hidden p-4 mb-6 text-sm text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl shadow-sm animate-fade-in" role="alert">
             Success message goes here.
         </div>
 
         <!-- Login View -->
-        <div id="login-view" class="bg-white p-8 rounded-2xl shadow-xl animate-fade-in">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Patient Login</h2>
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label for="login-email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input type="email" id="login-email" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+        <div id="login-view" class="glass-panel p-8 rounded-3xl shadow-2xl animate-fade-in">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900">Welcome Back</h2>
+                <p class="text-gray-500 text-sm mt-1">Please sign in to continue</p>
+            </div>
+            
+            <form id="login-form" class="space-y-5">
+                <div class="space-y-1">
+                    <label for="login-email" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Email</label>
+                    <input type="email" id="login-email" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="you@example.com" required>
                 </div>
-                <div>
-                    <label for="login-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="login-password" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center ml-1">
+                        <label for="login-password" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Password</label>
+                        <button type="button" id="show-reset-btn" class="text-xs font-medium text-indigo-600 hover:text-indigo-500 transition-colors">Forgot Password?</button>
+                    </div>
+                    <input type="password" id="login-password" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="••••••••" required>
                 </div>
-                <div class="text-right">
-                    <button type="button" id="show-reset-btn" class="text-sm font-medium text-blue-600 hover:text-blue-500">Forgot Password?</button>
-                </div>
-                <button id="login-btn" type="submit" class="w-full h-12 flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-base font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:-translate-y-0.5">
-                    Login
+                
+                <button id="login-btn" type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/30 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+                    Sign In
                 </button>
             </form>
-            <p class="mt-6 text-center text-sm text-gray-600">
-                Don't have an account?
-                <button id="show-register-btn" class="font-medium text-blue-600 hover:text-blue-500">
-                    Sign Up
-                </button>
-            </p>
+            
+            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+                <p class="text-sm text-gray-500">
+                    New to MediQue?
+                    <button id="show-register-btn" class="font-semibold text-indigo-600 hover:text-indigo-500 ml-1 transition-colors">
+                        Create Account
+                    </button>
+                </p>
+            </div>
         </div>
 
         <!-- Register View -->
-        <div id="register-view" class="bg-white p-8 rounded-2xl shadow-xl animate-fade-in" style="display: none;">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Create Patient Account</h2>
-            <form id="register-form" class="space-y-4">
-                <div>
-                    <label for="register-name" class="block text-sm font-medium text-gray-700">Full Name</label>
-                    <input type="text" id="register-name" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+        <div id="register-view" class="glass-panel p-8 rounded-3xl shadow-2xl animate-fade-in" style="display: none;">
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-900">Create Account</h2>
+                <p class="text-gray-500 text-sm mt-1">Join MediQue for a better experience</p>
+            </div>
+
+            <form id="register-form" class="space-y-5">
+                <div class="space-y-1">
+                    <label for="register-name" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Full Name</label>
+                    <input type="text" id="register-name" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="John Doe" required>
                 </div>
-                <div>
-                    <label for="register-email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input type="email" id="register-email" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                <div class="space-y-1">
+                    <label for="register-email" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Email</label>
+                    <input type="email" id="register-email" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="you@example.com" required>
                 </div>
-                <div>
-                    <label for="register-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="register-password" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                <div class="space-y-1">
+                    <label for="register-password" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Password</label>
+                    <input type="password" id="register-password" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="••••••••" required>
                 </div>
-                <button id="register-btn" type="submit" class="w-full h-12 flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-base font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:-translate-y-0.5">
+                
+                <button id="register-btn" type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/30 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
                     Create Account
                 </button>
             </form>
-            <p class="mt-6 text-center text-sm text-gray-600">
-                Already have an account?
-                <button id="show-login-btn" class="font-medium text-blue-600 hover:text-blue-500">
-                    Login
-                </button>
-            </p>
+            
+            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+                <p class="text-sm text-gray-500">
+                    Already have an account?
+                    <button id="show-login-btn" class="font-semibold text-indigo-600 hover:text-indigo-500 ml-1 transition-colors">
+                        Sign In
+                    </button>
+                </p>
+            </div>
         </div>
 
         <!-- Reset Password View -->
-        <div id="reset-view" class="bg-white p-8 rounded-2xl shadow-xl animate-fade-in" style="display: none;">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Reset Password</h2>
-            <p class="text-center text-sm text-gray-600 mb-4">Enter your email address and we will send you a link to reset your password.</p>
-            <form id="reset-form" class="space-y-4">
-                <div>
-                    <label for="reset-email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input type="email" id="reset-email" class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+        <div id="reset-view" class="glass-panel p-8 rounded-3xl shadow-2xl animate-fade-in" style="display: none;">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Reset Password</h2>
+                <p class="text-gray-500 text-sm mt-1">We'll send you a link to reset it</p>
+            </div>
+            
+            <form id="reset-form" class="space-y-5">
+                <div class="space-y-1">
+                    <label for="reset-email" class="block text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1">Email</label>
+                    <input type="email" id="reset-email" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="you@example.com" required>
                 </div>
-                <button id="reset-btn" type="submit" class="w-full h-12 flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-base font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform hover:-translate-y-0.5">
+                
+                <button id="reset-btn" type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/30 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
                     Send Reset Link
                 </button>
             </form>
-            <p class="mt-6 text-center text-sm text-gray-600">
-                Remembered your password?
-                <button id="cancel-reset-btn" class="font-medium text-blue-600 hover:text-blue-500">
-                    Login
+            
+            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+                <button id="cancel-reset-btn" class="text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center mx-auto">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Back to Login
                 </button>
-            </p>
+            </div>
         </div>
 
     </div>

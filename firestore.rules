@@ -2,56 +2,91 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- PUBLIC DATA ---
-    
-    // The public live queue (includes financial data: fee, status, completedAt)
-    match /artifacts/{appId}/public/data/queue/{docId} {
-      allow read: if request.auth != null;
-      // Allow authenticated users to create queue entries
-      allow create: if request.auth != null;
-      // Only admin can update (to add fee, notes, mark as seen/completed)
-      allow update: if request.auth.token.email == "prajansanjayko@gmail.com";
-      allow delete: if request.auth.token.email == "prajansanjayko@gmail.com";
+    // --- HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
     }
     
-    // Clinic status (daily limit)
-    match /artifacts/{appId}/public/data/clinicStatus/{docId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.token.email == "prajansanjayko@gmail.com";
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "v.kethari@gmail.com";
     }
     
-    // Clinic settings (location coordinates, max distance)
-    match /artifacts/{appId}/public/data/clinicSettings/{docId} {
-      // All authenticated users can read clinic settings
-      allow read: if request.auth != null;
-      // Only admin can write clinic settings
-      allow write: if request.auth.token.email == "prajansanjayko@gmail.com";
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
-    
-    // --- PRIVATE USER DATA ---
-    
-    // A user's private visit history
-    match /artifacts/{appId}/users/{userId}/visits/{visitId} {
-      allow read: if request.auth.uid == userId;
-      allow create: if request.auth.token.email == "prajansanjayko@gmail.com";
-      allow update, delete: if false;
+
+    // --- RULES ---
+
+    // Admin has full access to everything
+    match /{path=**} {
+      allow read, write: if isAdmin();
     }
-    
-    // A user's private profile (name, mobile)
-    match /artifacts/{appId}/users/{userId}/profile/details {
-      allow read, write: if request.auth.uid == userId;
+
+    // Collection Group Queries for Appointments (Needed for Patient Dashboard & Slot Availability)
+    match /{path=**}/appointments/{appointmentId} {
+      allow read: if isSignedIn();
     }
-    
-    // Future Appointments
-    match /appointments/{aptId} {
-      // Admin OR Patient can read
-      allow read: if request.auth.token.email == "prajansanjayko@gmail.com" || request.auth.uid == resource.data.patientId;
-      // A patient can create their own appointments
-      allow create: if request.auth.uid == request.resource.data.patientId;
-      // No one can update or delete
-      allow update, delete: if false;
+
+    // ARTIFACTS COLLECTION (Main app data)
+    match /artifacts/{appId} {
+      
+      // Public Data (Queue, Appointments, Settings, etc.)
+      match /public/data/{document=**} {
+        // Patient can read clinic status, settings, etc.
+        allow read: if isSignedIn();
+        
+        // Unauthenticated can read clinic status for passcode check
+        match /clinicStatus/status {
+          allow read: if true;
+        }
+      }
+
+      // Queue Management
+      match /public/data/queue/{queueId} {
+        allow create: if isSignedIn();
+        allow read: if isSignedIn();
+        allow update: if isSignedIn() && (request.resource.data.patientId == request.auth.uid || request.resource.data.status == "cancelled" || isAdmin());
+      }
+
+      // Appointment Bookings (Direct Path)
+      match /public/data/appointments/{appointmentId} {
+        allow create: if isSignedIn();
+        allow read: if isSignedIn();
+      }
+
+      // Patients Directory (patients can update their own record)
+      match /public/data/patients/{patientId} {
+        allow read: if isSignedIn();
+        allow create, update: if isSignedIn() && patientId == request.auth.uid;
+      }
+
+      // Chat Rooms & Messages
+      match /public/data/chatRooms/{roomId} {
+        // Patients read/write/update their own room (roomId is usually their UID)
+        allow read, create, update: if isSignedIn() && (roomId == request.auth.uid || resource.data.patientId == request.auth.uid || isAdmin());
+        
+        match /messages/{messageId} {
+          allow read, create, update: if isSignedIn() && (roomId == request.auth.uid || isAdmin());
+        }
+      }
+
+      // PATIENT SPECIFIC DATA
+      match /users/{userId} {
+        // Profile & Registration
+        match /registration/{docId} {
+          allow read, write: if isOwner(userId);
+        }
+        
+        match /profile/{docId} {
+          allow read, write: if isOwner(userId);
+        }
+        
+        // Visits / Prescriptions
+        match /visits/{visitId} {
+          allow read: if isOwner(userId) || isAdmin();
+        }
+      }
     }
-    
   }
 }
 

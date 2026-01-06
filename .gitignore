@@ -67,3 +67,10 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Local/Temp files
+Untitled*
+*.txt
+patient2345.html
+prop.png
+zego.js
