@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1e40af" />
+    <title>MediQue OS | Firestore System Initializer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex items-center justify-center p-6">
+
+    <div class="w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-2xl p-8 space-y-6">
+        
+        <!-- Header -->
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg">M</div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-slate-900">MediQue Database Setup</h1>
+                <p class="text-xs text-slate-500 uppercase tracking-wider font-bold">Automated Collection & Admin Provisioning</p>
+            </div>
+        </div>
+
+        <p class="text-sm text-slate-600 leading-relaxed">
+            This utility will automatically instantiate all required collections (Status, Settings, Broadcast, Live Queue, and Appointments) on your live Firebase project.
+        </p>
+
+        <!-- Configuration Verification -->
+        <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-xs space-y-2">
+            <span class="font-bold text-blue-900 block">Current Target Database:</span>
+            <div class="grid grid-cols-2 gap-2 text-blue-700">
+                <span>Project ID: <strong id="lbl-project-id">medique-b29ee</strong></span>
+                <span>Region: <strong>Multi-Region (US/EU)</strong></span>
+            </div>
+        </div>
+
+        <!-- Setup Form -->
+        <form id="setup-form" onsubmit="runInitialization(event)" class="space-y-4">
+            <div class="space-y-1">
+                <label class="text-[10px] uppercase font-bold text-slate-400 block">Admin/Doctor Email</label>
+                <input id="admin-email" type="email" placeholder="doctor@clinic.com" required class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none">
+                <p class="text-[10px] text-slate-400">Important: This email is set as YOUR_ADMIN_EMAIL in firestore.rules to authorize doctor privileges.</p>
+            </div>
+            
+            <div class="space-y-1">
+                <label class="text-[10px] uppercase font-bold text-slate-400 block">Admin Password</label>
+                <input id="admin-password" type="password" placeholder="••••••••" required minlength="8" class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-500 focus:outline-none">
+            </div>
+
+            <button type="submit" id="btn-submit" class="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-500/20 transition-all transform hover:-translate-y-0.5">
+                Register Admin & Initialize Collections
+            </button>
+        </form>
+
+        <!-- Progress Log -->
+        <div class="space-y-2">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block">Execution logs</span>
+            <div id="logs-container" class="h-36 overflow-y-auto font-mono text-[10px] text-emerald-400 bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1">
+                <div>[System] Ready to run setup.</div>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <a href="index.html" class="text-xs font-bold text-blue-600 hover:underline">&larr; Back to Login Gateway</a>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, serverTimestamp, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Real Firebase config
+        const firebaseConfig = {
+          apiKey: "AIzaSyBmhvep0QM24Mf3SesIital2CCETmlsJ-4",
+          authDomain: "medique-b29ee.firebaseapp.com",
+          projectId: "medique-b29ee",
+          storageBucket: "medique-b29ee.firebasestorage.app",
+          messagingSenderId: "16979338752",
+          appId: "1:16979338752:web:1d4ca34fb54fdad6b55ae5",
+          measurementId: "G-PH4EKPV5NL"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = firebaseConfig.projectId;
+
+        function logMsg(msg, status = 'info') {
+            const logs = document.getElementById('logs-container');
+            const time = new Date().toLocaleTimeString();
+            const colorClass = status === 'success' ? 'text-emerald-400 font-bold' : status === 'error' ? 'text-rose-400 font-bold' : 'text-slate-300';
+            logs.innerHTML += `<div><span class="text-slate-500">[${time}]</span> <span class="${colorClass}">${msg}</span></div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        window.runInitialization = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('admin-email').value.trim();
+            const password = document.getElementById('admin-password').value;
+            const btn = document.getElementById('btn-submit');
+            
+            btn.disabled = true;
+            btn.textContent = "Initializing System...";
+            
+            logMsg("1. Starting initialization sequence...", "info");
+
+            try {
+                // Step 1: Create Admin Auth Account
+                let uid;
+                try {
+                    logMsg(`2. Creating admin user account (${email})...`, "info");
+                    const userCred = await createUserWithEmailAndPassword(auth, email, password);
+                    await updateProfile(userCred.user, { displayName: "Clinic Admin" });
+                    uid = userCred.user.uid;
+                    logMsg("✓ Admin Auth account created successfully.", "success");
+                } catch (authErr) {
+                    if (authErr.code === 'auth/email-already-in-use') {
+                        logMsg("ℹ Email already registered. Attempting to sign in with provided password...", "info");
+                        const userCred = await signInWithEmailAndPassword(auth, email, password);
+                        uid = userCred.user.uid;
+                        logMsg("✓ Signed in successfully as existing admin.", "success");
+                    } else {
+                        throw authErr;
+                    }
+                }
+
+                // Step 2: Write Admin Profile Document in Users collection
+                logMsg("3. Creating Admin profile record in /users collection...", "info");
+                await setDoc(doc(db, `artifacts/${appId}/users/${uid}`), {
+                    name: "Clinic Admin",
+                    email: email,
+                    role: "admin",
+                    clinicId: appId,
+                    createdAt: serverTimestamp()
+                });
+                logMsg("✓ Admin Profile document instantiated.", "success");
+
+                // Step 3: Write Clinic Status Document
+                logMsg("4. Creating Clinic Status document (/public/data/clinicStatus/status)...", "info");
+                await setDoc(doc(db, `artifacts/${appId}/public/data/clinicStatus/status`), {
+                    isOpen: true,
+                    currentServing: "None",
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                logMsg("✓ Clinic Status document instantiated.", "success");
+
+                // Step 4: Write Clinic Settings Document
+                logMsg("5. Creating Clinic Settings document (/public/data/clinicSettings/settings)...", "info");
+                await setDoc(doc(db, `artifacts/${appId}/public/data/clinicSettings/settings`), {
+                    defaultDuration: 10,
+                    intelligentMode: true,
+                    emergencyOverride: true,
+                    noShowTimeoutMinutes: 15,
+                    doctorName: "Dr. Admin",
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                logMsg("✓ Clinic Settings document instantiated.", "success");
+
+                // Step 5: Write General Broadcast Announcement
+                logMsg("6. Creating Broadcast channels (/public/data/broadcast/general)...", "info");
+                await setDoc(doc(db, `artifacts/${appId}/public/data/broadcast/general`), {
+                    activeAlert: "Welcome to MediQue. Live queue status is active on your phone.",
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                logMsg("✓ Clinic Announcements channel instantiated.", "success");
+
+                // Step 6: Trigger collections materialize for Queue and Appointments
+                logMsg("7. Materializing live queue and appointment collection pathways...", "info");
+                const tempQueueDoc = doc(collection(db, `artifacts/${appId}/public/data/queue`));
+                await setDoc(tempQueueDoc, {
+                    name: "System Init",
+                    status: "completed",
+                    joinedAt: serverTimestamp(),
+                    token: "INIT-00"
+                });
+                await deleteDoc(tempQueueDoc);
+                logMsg("✓ Live Queue collection initialized successfully.", "success");
+
+                logMsg("\n🎉 SYSTEM PROVISIONING COMPLETED SUCCESSFULLY!", "success");
+                logMsg("You can now sign in at index.html using these admin credentials.");
+                
+                alert("🎉 Firestore Collections & Admin Account Initialized Successfully!");
+                btn.textContent = "Setup Completed";
+
+            } catch (err) {
+                console.error(err);
+                logMsg(`❌ Error: ${err.message}`, "error");
+                btn.disabled = false;
+                btn.textContent = "Retry Setup";
+            }
+        };
+    </script>
+</body>
+</html>

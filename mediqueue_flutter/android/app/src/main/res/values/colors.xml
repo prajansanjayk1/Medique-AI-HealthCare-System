@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MediQue brand teal - used as default FCM notification accent color -->
+    <color name="notification_color">#14B8A6</color>
+    <!-- Primary brand color -->
+    <color name="primary">#0EA5E9</color>
+    <!-- Background color -->
+    <color name="background">#FFFFFF</color>
+</resources>

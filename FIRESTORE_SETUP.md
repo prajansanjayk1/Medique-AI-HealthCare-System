@@ -88,3 +88,4 @@ The financials queries require a composite index. Firebase will show you a link 
 - Change this in both the rules file and the `index.html` file (ADMIN_EMAIL constant) if needed
 - All financial data (fees) are stored in the queue documents, allowing historical financial tracking
 
+

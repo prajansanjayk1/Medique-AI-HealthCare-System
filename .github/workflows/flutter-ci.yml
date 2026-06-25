@@ -1,0 +1,38 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  flutter-analyze:
+    name: Flutter Analyze & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+
+      - name: Install dependencies
+        working-directory: mediqueue_flutter
+        run: flutter pub get
+
+      - name: Analyze code
+        working-directory: mediqueue_flutter
+        run: flutter analyze
+
+      - name: Run tests
+        working-directory: mediqueue_flutter
+        run: flutter test
+
+      - name: Build APK (debug)
+        working-directory: mediqueue_flutter
+        run: flutter build apk --debug

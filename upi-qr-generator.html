@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5" />
+    <title>Dynamic UPI QR Code Generator Studio</title>
+    <!-- Google Fonts for premium typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Load QRious Library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" 
+            integrity="sha512-4Q4f759N5f4H4H1xI52yV9074g1V5u8y22YtU4kOqF55D/A/n2U69b7z55g4F5n5F14/" 
+            crossorigin="anonymous"
+            onerror="handleQRLibraryError()"></script>
+    <style>
+        /* === CUSTOM CSS DESIGN SYSTEM (VANILLA) === */
+        :root {
+            --bg-gradient: radial-gradient(at 0% 0%, hsla(243, 75%, 97%, 1) 0, transparent 50%), 
+                           radial-gradient(at 50% 0%, hsla(260, 60%, 96%, 1) 0, transparent 50%), 
+                           radial-gradient(at 100% 0%, hsla(210, 70%, 97%, 1) 0, transparent 50%);
+            --bg-color: #f8fafc;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(255, 255, 255, 0.6);
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --primary-light: #e0e7ff;
+            --success: #10b981;
+            --success-bg: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-bg: #fffbeb;
+            --error: #ef4444;
+            --error-bg: #fef2f2;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.08);
+            --shadow-lg: 0 10px 30px -5px rgba(79, 70, 229, 0.1);
+            --glass-blur: blur(16px);
+            --font-main: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient: radial-gradient(at 0% 0%, hsla(243, 50%, 12%, 1) 0, transparent 50%), 
+                           radial-gradient(at 50% 0%, hsla(260, 45%, 10%, 1) 0, transparent 50%), 
+                           radial-gradient(at 100% 0%, hsla(210, 50%, 13%, 1) 0, transparent 50%);
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.85);
+            --card-border: rgba(255, 255, 255, 0.05);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --primary-light: #1e1b4b;
+            --success: #34d399;
+            --success-bg: #064e3b;
+            --warning: #fbbf24;
+            --warning-bg: #78350f;
+            --error: #f87171;
+            --error-bg: #7f1d1d;
+            --border-color: #1f2937;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 20px -2px rgba(0,0,0,0.4);
+            --shadow-lg: 0 10px 30px -5px rgba(99, 102, 241, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-main);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            background-image: var(--bg-gradient);
+            background-size: cover;
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text-main);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* === HEADER === */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo-section h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo-section p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .theme-switch {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            box-shadow: var(--shadow-sm);
+            color: var(--text-main);
+        }
+
+        .theme-switch svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+        }
+
+        /* === GRID LAYOUT === */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 968px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* === GLASS CARD === */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            border: 1px solid var(--card-border);
+            border-radius: 1.25rem;
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        /* === FORM CONTROLS === */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            position: relative;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status-indicator {
+            position: absolute;
+            right: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .status-indicator svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .error-message {
+            font-size: 0.8rem;
+            color: var(--error);
+            margin-top: 0.25rem;
+            display: none;
+            font-weight: 500;
+        }
+
+        /* === CHIPS === */
+        .chip-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+        }
+
+        .chip {
+            background: var(--border-color);
+            color: var(--text-muted);
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+        }
+
+        .chip:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+            transform: scale(1.02);
+        }
+
+        /* === PREVIEW SURFACE === */
+        .preview-pane {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .qr-card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e2e8f0;
+            position: relative;
+            max-width: 250px;
+            width: 100%;
+        }
+
+        .qr-card canvas {
+            max-width: 200px;
+            max-height: 200px;
+            width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+
+        .compatibility-ribbon {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            width: 100%;
+            padding: 0.5rem 0;
+            border-top: 1px solid var(--border-color);
+            margin-top: 0.5rem;
+        }
+
+        .comp-icon {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: #f1f5f9;
+            color: #475569;
+            text-transform: uppercase;
+        }
+
+        /* === PREVIEW DETAILS === */
+        .payment-details {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+        }
+
+        .detail-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: var(--text-main);
+            text-align: right;
+            max-width: 70%;
+            word-break: break-all;
+        }
+
+        .uri-box {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .uri-text {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(0,0,0,0.05);
+            border-radius: 0.5rem;
+            word-break: break-all;
+            max-height: 80px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            color: var(--primary);
+        }
+
+        /* === ACTIONS === */
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            width: 100%;
+        }
+
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        button.btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            outline: none;
+            border: none;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        button.btn-primary {
+            background: var(--primary);
+            color: #ffffff;
+        }
+
+        button.btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        button.btn-secondary {
+            background: var(--border-color);
+            color: var(--text-main);
+        }
+
+        button.btn-secondary:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-1px);
+        }
+
+        /* === CONFIG PANEL === */
+        .config-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            width: 100%;
+        }
+
+        /* === DIAGNOSTICS & TROUBLESHOOTING === */
+        .diagnostics-container {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .diagnostic-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .diagnostic-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .diag-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .diag-status {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+        }
+
+        .status-pass {
+            background: var(--success-bg);
+            color: var(--success);
+        }
+
+        .status-warn {
+            background: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .status-fail {
+            background: var(--error-bg);
+            color: var(--error);
+        }
+
+        .diag-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
+        /* === UNIT TESTS TAB === */
+        .tabs-header {
+            display: flex;
+            gap: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            font-size: 0.95rem;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* === TEST PANEL === */
+        .test-console-wrapper {
+            background: #090d16;
+            color: #34d399;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #1e2937;
+        }
+
+        .test-console-line {
+            margin-bottom: 0.25rem;
+            white-space: pre-wrap;
+        }
+
+        .test-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .test-table th, .test-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .test-table th {
+            background: rgba(255,255,255,0.03);
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* === TOAST NOTIFICATIONS === */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 9999;
+        }
+
+        .toast {
+            background: #1f2937;
+            color: #ffffff;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .toast-success {
+            border-left: 4px solid var(--success);
+        }
+
+        .toast-error {
+            border-left: 4px solid var(--error);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <header>
+            <div class="logo-section">
+                <h1>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="24" height="24" rx="6" fill="#4F46E5"/>
+                        <path d="M12 5V19M5 12H19" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+                        <rect x="7" y="7" width="10" height="10" rx="2" stroke="white" stroke-width="2" fill="none"/>
+                    </svg>
+                    MediQue Pay
+                </h1>
+                <p>Dynamic UPI QR Generator Module (Production-Ready)</p>
+            </div>
+            <button class="theme-switch" id="theme-switch" aria-label="Toggle Theme">
+                <svg viewBox="0 0 24 24" id="sun-icon">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg viewBox="0 0 24 24" id="moon-icon" style="display:none;">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <div class="grid-layout">
+            <!-- LEFT PANEL: INPUT FORM -->
+            <div class="card">
+                <div class="tabs-header">
+                    <button class="tab-btn active" onclick="switchTab('generator')">QR Generator</button>
+                    <button class="tab-btn" id="tab-test-btn" onclick="switchTab('tests')">Interactive Tests</button>
+                </div>
+
+                <!-- TAB CONTENT: GENERATOR -->
+                <div id="generator-tab" class="tab-content active">
+                    <!-- UPI ID (VPA) -->
+                    <div class="form-group">
+                        <label for="upi-id">UPI ID (VPA) *</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="upi-id" placeholder="e.g. merchant@bank" autocomplete="off">
+                            <span class="status-indicator" id="vpa-status-icon"></span>
+                        </div>
+                        <div class="error-message" id="vpa-error">Invalid UPI ID format.</div>
+                        <div class="chip-container">
+                            <span class="chip" onclick="fillInput('upi-id', 'BHARATPE2Z0N0D6S7Q31896@unitype')">BHARATPE2Z0N0D6S7Q31896@unitype (Required Test)</span>
+                            <span class="chip" onclick="fillInput('upi-id', 'prajansanjayko@okaxis')">prajansanjayko@okaxis</span>
+                        </div>
+                    </div>
+
+                    <!-- Merchant Name -->
+                    <div class="form-group">
+                        <label for="merchant-name">Merchant Name *</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="merchant-name" placeholder="e.g. BharatPe" autocomplete="off">
+                            <span class="status-indicator" id="merchant-status-icon"></span>
+                        </div>
+                        <div class="error-message" id="merchant-error">Merchant name cannot be empty.</div>
+                        <div class="chip-container">
+                            <span class="chip" onclick="fillInput('merchant-name', 'BharatPe')">BharatPe</span>
+                            <span class="chip" onclick="fillInput('merchant-name', 'MediQue Clinic')">MediQue Clinic</span>
+                        </div>
+                    </div>
+
+                    <!-- Amount -->
+                    <div class="form-group">
+                        <label for="amount">Amount (INR) <span style="font-weight:normal; font-size:0.75rem;">(Optional)</span></label>
+                        <div class="input-wrapper">
+                            <input type="number" id="amount" placeholder="e.g. 500.00" min="0" step="0.01">
+                            <span class="status-indicator" id="amount-status-icon"></span>
+                        </div>
+                        <div class="error-message" id="amount-error">Amount must be positive with up to 2 decimals.</div>
+                        <div class="chip-container">
+                            <span class="chip" onclick="fillInput('amount', '')">Clear</span>
+                            <span class="chip" onclick="fillInput('amount', '1.00')">₹1.00</span>
+                            <span class="chip" onclick="fillInput('amount', '150.00')">₹150.00</span>
+                            <span class="chip" onclick="fillInput('amount', '500.00')">₹500.00</span>
+                            <span class="chip" onclick="fillInput('amount', '1000.00')">₹1000.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Note -->
+                    <div class="form-group">
+                        <label for="note">Transaction Note <span style="font-weight:normal; font-size:0.75rem;">(Optional)</span></label>
+                        <div class="input-wrapper">
+                            <input type="text" id="note" placeholder="e.g. Consultation Fee" maxlength="80">
+                            <span class="status-indicator" id="note-status-icon"></span>
+                        </div>
+                        <div class="error-message" id="note-error">Note contains unsupported characters or exceeds 80 characters.</div>
+                        <div class="chip-container">
+                            <span class="chip" onclick="fillInput('note', 'Consultation')">Consultation</span>
+                            <span class="chip" onclick="fillInput('note', 'Medicine Charges')">Medicine Charges</span>
+                        </div>
+                    </div>
+
+                    <!-- Config section -->
+                    <div class="config-section">
+                        <div class="form-group">
+                            <label for="qr-ecc">QR Error Correction</label>
+                            <select id="qr-ecc">
+                                <option value="L">L (Low ~7%)</option>
+                                <option value="M" selected>M (Medium ~15%)</option>
+                                <option value="Q">Q (Quartile ~25%)</option>
+                                <option value="H">H (High ~30%)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="qr-color">QR Foreground Color</label>
+                            <select id="qr-color">
+                                <option value="#000000" selected>Classic Black</option>
+                                <option value="#1e1b4b">Indigo Navy</option>
+                                <option value="#065f46">Dark Emerald</option>
+                                <option value="#9d174d">Rose Red</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB CONTENT: TESTS -->
+                <div id="tests-tab" class="tab-content">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="font-size:1.1rem; font-weight:600;">Client-Side Unit Tests</h3>
+                        <button class="btn btn-primary" onclick="runUnitTests()" style="padding: 0.5rem 1rem;">Run Suite</button>
+                    </div>
+                    
+                    <div class="test-console-wrapper" id="test-console">
+                        <div class="test-console-line">Console: Click "Run Suite" to execute test assertions...</div>
+                    </div>
+
+                    <table class="test-table">
+                        <thead>
+                            <tr>
+                                <th>Test Case</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="test-table-body">
+                            <!-- Populated dynamically -->
+                            <tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No tests run yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: PREVIEW & ACTIONS -->
+            <div class="card">
+                <div class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    Live Preview
+                </div>
+
+                <div class="preview-pane">
+                    <!-- QR Box -->
+                    <div class="qr-card" id="qr-card-container">
+                        <canvas id="qr-canvas"></canvas>
+                        <!-- Compatibility icons list -->
+                        <div class="compatibility-ribbon">
+                            <span class="comp-icon">GPay</span>
+                            <span class="comp-icon">PhonePe</span>
+                            <span class="comp-icon">Paytm</span>
+                            <span class="comp-icon">BHIM</span>
+                            <span class="comp-icon">BharatPe</span>
+                        </div>
+                    </div>
+
+                    <!-- Payment Summary -->
+                    <div class="payment-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Merchant Name</span>
+                            <span class="detail-value" id="preview-merchant">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">UPI ID</span>
+                            <span class="detail-value" id="preview-upi">-</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Amount</span>
+                            <span class="detail-value" id="preview-amount">Any Amount</span>
+                        </div>
+                        <div class="detail-row" id="row-note" style="display:none;">
+                            <span class="detail-label">Note</span>
+                            <span class="detail-value" id="preview-note">-</span>
+                        </div>
+                    </div>
+
+                    <!-- UPI URI -->
+                    <div class="uri-box">
+                        <label>Generated UPI Payment URI</label>
+                        <div class="uri-text" id="uri-preview">upi://pay?...</div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="action-grid">
+                        <button class="btn btn-primary" onclick="downloadPNG()">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            Download QR as PNG (High-Res)
+                        </button>
+                        <div class="btn-row">
+                            <button class="btn btn-secondary" onclick="copyURI()">Copy URI</button>
+                            <button class="btn btn-secondary" onclick="copyUPI()">Copy UPI ID</button>
+                        </div>
+                        <button class="btn btn-primary" onclick="payWithUpiApp()" style="background: linear-gradient(135deg, #10b981, #059669); margin-top: 0.25rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                            </svg>
+                            Pay using UPI App (Intent)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTTOM SECTION: DIAGNOSTICS -->
+            <div class="card diagnostics-container">
+                <div class="card-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                    Scan Health Check & Diagnostics
+                </div>
+                
+                <div class="diagnostic-grid" id="diagnostic-grid">
+                    <!-- UPI ID Format -->
+                    <div class="diagnostic-card">
+                        <div class="diag-header">
+                            VPA Format Check
+                            <span class="diag-status status-pass" id="diag-vpa-status">PASS</span>
+                        </div>
+                        <div class="diag-desc" id="diag-vpa-desc">Valid format username@handle. Complies with NPCI structure.</div>
+                    </div>
+
+                    <!-- URI Encoding -->
+                    <div class="diagnostic-card">
+                        <div class="diag-header">
+                            URI Encoding Check
+                            <span class="diag-status status-pass" id="diag-encoding-status">PASS</span>
+                        </div>
+                        <div class="diag-desc" id="diag-encoding-desc">Merchant name and notes are percent-encoded to prevent app parsing exceptions.</div>
+                    </div>
+
+                    <!-- Special Characters -->
+                    <div class="diagnostic-card">
+                        <div class="diag-header">
+                            Special Characters Check
+                            <span class="diag-status status-pass" id="diag-special-status">PASS</span>
+                        </div>
+                        <div class="diag-desc" id="diag-special-desc">No raw URL breaking parameters (&, =, ?) detected in textual inputs.</div>
+                    </div>
+
+                    <!-- ECC Recommendations -->
+                    <div class="diagnostic-card">
+                        <div class="diag-header">
+                            QR Error Correction
+                            <span class="diag-status status-pass" id="diag-ecc-status">OPTIMAL</span>
+                        </div>
+                        <div class="diag-desc" id="diag-ecc-desc">Error correction density level fits the text payload length perfectly.</div>
+                    </div>
+
+                    <!-- Contrast & Density -->
+                    <div class="diagnostic-card">
+                        <div class="diag-header">
+                            Color Contrast Ratio
+                            <span class="diag-status status-pass" id="diag-contrast-status">PASS</span>
+                        </div>
+                        <div class="diag-desc" id="diag-contrast-desc">Color contrast ratio exceeds the recommended limit (>3:1) for optical scanner devices.</div>
+                    </div>
+
+                    <!-- Decline Risk Check -->
+                    <div class="diagnostic-card">
+                        <div class="diag-header">
+                            Decline Risk Check
+                            <span class="diag-status status-pass" id="diag-decline-status">LOW</span>
+                        </div>
+                        <div class="diag-desc" id="diag-decline-desc">No transaction decline indicators found. Routable VPA and compliant amount.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // === DOM ELEMENTS ===
+        const elUpiId = document.getElementById('upi-id');
+        const elMerchantName = document.getElementById('merchant-name');
+        const elAmount = document.getElementById('amount');
+        const elNote = document.getElementById('note');
+        const elQrEcc = document.getElementById('qr-ecc');
+        const elQrColor = document.getElementById('qr-color');
+
+        const elVpaStatusIcon = document.getElementById('vpa-status-icon');
+        const elMerchantStatusIcon = document.getElementById('merchant-status-icon');
+        const elAmountStatusIcon = document.getElementById('amount-status-icon');
+        const elNoteStatusIcon = document.getElementById('note-status-icon');
+
+        const elVpaError = document.getElementById('vpa-error');
+        const elMerchantError = document.getElementById('merchant-error');
+        const elAmountError = document.getElementById('amount-error');
+        const elNoteError = document.getElementById('note-error');
+
+        const elPreviewMerchant = document.getElementById('preview-merchant');
+        const elPreviewUpi = document.getElementById('preview-upi');
+        const elPreviewAmount = document.getElementById('preview-amount');
+        const elPreviewNote = document.getElementById('preview-note');
+        const elRowNote = document.getElementById('row-note');
+        const elUriPreview = document.getElementById('uri-preview');
+        const elCanvas = document.getElementById('qr-canvas');
+
+        // Diagnostics
+        const elDiagVpaStatus = document.getElementById('diag-vpa-status');
+        const elDiagVpaDesc = document.getElementById('diag-vpa-desc');
+        const elDiagEncodingStatus = document.getElementById('diag-encoding-status');
+        const elDiagEncodingDesc = document.getElementById('diag-encoding-desc');
+        const elDiagSpecialStatus = document.getElementById('diag-special-status');
+        const elDiagSpecialDesc = document.getElementById('diag-special-desc');
+        const elDiagEccStatus = document.getElementById('diag-ecc-status');
+        const elDiagEccDesc = document.getElementById('diag-ecc-desc');
+        const elDiagContrastStatus = document.getElementById('diag-contrast-status');
+        const elDiagContrastDesc = document.getElementById('diag-contrast-desc');
+
+        let qrCodeInstance = null;
+        let isLibAvailable = true;
+
+        // === SYSTEM DEFAULT VALUES ===
+        window.addEventListener('DOMContentLoaded', () => {
+            // Apply theme preference
+            const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            setTheme(savedTheme);
+
+            // Set default test values
+            elUpiId.value = 'BHARATPE2Z0N0D6S7Q31896@unitype';
+            elMerchantName.value = 'BharatPe';
+            elAmount.value = '';
+            elNote.value = '';
+
+            // Add change listeners
+            [elUpiId, elMerchantName, elAmount, elNote, elQrEcc, elQrColor].forEach(el => {
+                el.addEventListener('input', updateGenerator);
+                el.addEventListener('change', updateGenerator);
+            });
+
+            // Initial render
+            updateGenerator();
+        });
+
+        // === THEME HANDLING ===
+        const btnTheme = document.getElementById('theme-switch');
+        const sunIcon = document.getElementById('sun-icon');
+        const moonIcon = document.getElementById('moon-icon');
+
+        btnTheme.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+        });
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            if (theme === 'dark') {
+                sunIcon.style.display = 'none';
+                moonIcon.style.display = 'block';
+            } else {
+                sunIcon.style.display = 'block';
+                moonIcon.style.display = 'none';
+            }
+        }
+
+        // === CDN FAILURE FALLBACK ===
+        function handleQRLibraryError() {
+            isLibAvailable = false;
+            showToast("QR Code library CDN load failed. Switched to fallback layout.", "error");
+            updateGenerator();
+        }
+
+        // === TABS SYSTEM ===
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            if (tab === 'generator') {
+                document.querySelector('[onclick="switchTab(\'generator\')"]').classList.add('active');
+                document.getElementById('generator-tab').classList.add('active');
+            } else {
+                document.getElementById('tab-test-btn').classList.add('active');
+                document.getElementById('tests-tab').classList.add('active');
+            }
+        }
+
+        // === FILL INPUT CHIPS ===
+        function fillInput(id, val) {
+            const input = document.getElementById(id);
+            input.value = val;
+            // Trigger input event to re-validate and draw
+            input.dispatchEvent(new Event('input'));
+        }
+
+        // === FORM VALIDATION ===
+        function validateVPA(vpa) {
+            if (!vpa) return { valid: false, message: "UPI ID cannot be empty." };
+            if (vpa.indexOf('@') === -1) return { valid: false, message: "UPI ID must contain exactly one '@'." };
+            const parts = vpa.split('@');
+            if (parts.length !== 2) return { valid: false, message: "UPI ID must contain exactly one '@'." };
+            const user = parts[0];
+            const handle = parts[1];
+            if (user.length < 2 || user.length > 256) return { valid: false, message: "VPA user handle must be between 2 and 256 characters." };
+            if (handle.length < 2 || handle.length > 64) return { valid: false, message: "VPA bank handle must be between 2 and 64 characters." };
+            // Standard NPCI username check: alphanumeric, dots, hyphens, underscores. Cannot have consecutive dots or start/end with dot
+            const userRegex = /^[a-zA-Z0-9]+([._-][a-zA-Z0-9]+)*$/;
+            if (!userRegex.test(user)) {
+                return { valid: false, message: "User handle contains invalid characters or consecutive dots/dashes." };
+            }
+            const handleRegex = /^[a-zA-Z0-9.\-_]+$/;
+            if (!handleRegex.test(handle)) {
+                return { valid: false, message: "Bank handle contains invalid characters." };
+            }
+            return { valid: true };
+        }
+
+        function validateMerchant(name) {
+            if (!name || name.trim() === '') return { valid: false, message: "Merchant name cannot be empty." };
+            if (name.length > 256) return { valid: false, message: "Merchant name exceeds 256 characters limit." };
+            return { valid: true };
+        }
+
+        function validateAmount(val) {
+            if (!val) return { valid: true }; // Optional
+            const num = parseFloat(val);
+            if (isNaN(num)) return { valid: false, message: "Amount must be a numeric value." };
+            if (num <= 0) return { valid: false, message: "Amount must be greater than zero." };
+            if (num > 1000000) return { valid: false, message: "Amount exceeds maximum transaction threshold." };
+            // Max 2 decimal precision check
+            const split = val.toString().split('.');
+            if (split.length > 1 && split[1].length > 2) {
+                return { valid: false, message: "Decimal precision cannot exceed 2 digits." };
+            }
+            return { valid: true };
+        }
+
+        function validateNote(val) {
+            if (!val) return { valid: true }; // Optional
+            if (val.length > 80) return { valid: false, message: "Note exceeds standard 80 character limit." };
+            return { valid: true };
+        }
+
+        // === RENDER VALIDATION STATUS UI ===
+        function setStatusUI(el, errorEl, indicatorEl, res) {
+            if (res.valid) {
+                el.style.borderColor = 'var(--success)';
+                errorEl.style.display = 'none';
+                indicatorEl.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>`;
+            } else {
+                el.style.borderColor = 'var(--error)';
+                errorEl.innerText = res.message;
+                errorEl.style.display = 'block';
+                indicatorEl.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>`;
+            }
+        }
+
+        // === CORE UPI STRING BUILDER ===
+        function buildUPIURI(vpa, merchant, amount, note) {
+            // Note: upi://pay?pa={UPI_ID}&pn={MERCHANT_NAME}&cu=INR
+            // If amount and notes are provided, they must be formatted: &am={AMOUNT}&cu=INR&tn={NOTE}
+            // Merchant name and note must be percent-encoded to prevent breaking characters
+            let uri = `upi://pay?pa=${vpa}&pn=${encodeURIComponent(merchant)}&cu=INR`;
+            if (amount) {
+                uri += `&am=${parseFloat(amount).toFixed(2)}`;
+            }
+            if (note) {
+                uri += `&tn=${encodeURIComponent(note)}`;
+            }
+            return uri;
+        }
+
+        // === MAIN GENERATOR ENGINE ===
+        function updateGenerator() {
+            const vpaVal = elUpiId.value.trim();
+            const merchantVal = elMerchantName.value.trim();
+            const amountVal = elAmount.value.trim();
+            const noteVal = elNote.value.trim();
+
+            const vpaRes = validateVPA(vpaVal);
+            const merchantRes = validateMerchant(merchantVal);
+            const amountRes = validateAmount(amountVal);
+            const noteRes = validateNote(noteVal);
+
+            setStatusUI(elUpiId, elVpaError, elVpaStatusIcon, vpaRes);
+            setStatusUI(elMerchantName, elMerchantError, elMerchantStatusIcon, merchantRes);
+            setStatusUI(elAmount, elAmountError, elAmountStatusIcon, amountRes);
+            setStatusUI(elNote, elNoteError, elNoteStatusIcon, noteRes);
+
+            const allValid = vpaRes.valid && merchantRes.valid && amountRes.valid && noteRes.valid;
+
+            if (allValid) {
+                const upiURI = buildUPIURI(vpaVal, merchantVal, amountVal, noteVal);
+
+                // Update Preview UI Text
+                elPreviewMerchant.innerText = merchantVal;
+                elPreviewUpi.innerText = vpaVal;
+                elPreviewAmount.innerText = amountVal ? `₹${parseFloat(amountVal).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 'Any Amount';
+                
+                if (noteVal) {
+                    elPreviewNote.innerText = noteVal;
+                    elRowNote.style.display = 'flex';
+                } else {
+                    elRowNote.style.display = 'none';
+                }
+
+                elUriPreview.innerText = upiURI;
+
+                // Render QR code
+                renderQR(upiURI);
+                // Perform diagnostics
+                runDiagnostics(vpaVal, merchantVal, amountVal, noteVal, upiURI);
+            } else {
+                // Clear Preview/QR UI
+                elPreviewMerchant.innerText = "-";
+                elPreviewUpi.innerText = "-";
+                elPreviewAmount.innerText = "-";
+                elRowNote.style.display = 'none';
+                elUriPreview.innerText = "Provide valid VPA and Merchant Name...";
+                clearQR();
+                runFailedDiagnostics(vpaRes, merchantRes, amountRes, noteRes);
+            }
+        }
+
+        // === RENDER QR ===
+        function renderQR(text) {
+            const eccLevel = elQrEcc.value;
+            const fgColor = elQrColor.value;
+
+            if (isLibAvailable && typeof QRious !== 'undefined') {
+                try {
+                    if (!qrCodeInstance) {
+                        qrCodeInstance = new QRious({
+                            element: elCanvas,
+                            size: 200,
+                            level: eccLevel,
+                            value: text,
+                            background: '#ffffff',
+                            foreground: fgColor
+                        });
+                    } else {
+                        qrCodeInstance.set({
+                            value: text,
+                            level: eccLevel,
+                            foreground: fgColor
+                        });
+                    }
+                } catch (e) {
+                    console.error("QRious generation failed, falling back", e);
+                    renderFallbackQR(text);
+                }
+            } else {
+                renderFallbackQR(text);
+            }
+        }
+
+        function renderFallbackQR(text) {
+            // Uses api.qrserver.com as fallback if local library fails
+            const ctx = elCanvas.getContext('2d');
+            ctx.clearRect(0, 0, elCanvas.width, elCanvas.height);
+            
+            // Draw a loading image in canvas
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, elCanvas.width, elCanvas.height);
+            };
+            img.onerror = function() {
+                ctx.fillStyle = "#f3f4f6";
+                ctx.fillRect(0, 0, elCanvas.width, elCanvas.height);
+                ctx.fillStyle = "#ef4444";
+                ctx.font = "12px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText("QR Load Error", elCanvas.width/2, elCanvas.height/2);
+            };
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=${elQrEcc.value}&color=${elQrColor.value.replace('#','')}&data=${encodeURIComponent(text)}`;
+        }
+
+        function clearQR() {
+            const ctx = elCanvas.getContext('2d');
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(0, 0, elCanvas.width, elCanvas.height);
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "12px var(--font-main)";
+            ctx.textAlign = "center";
+            ctx.fillText("Waiting for valid inputs...", elCanvas.width/2, elCanvas.height/2);
+        }
+
+        // === DIAGNOSTICS ENGINE ===
+        function runDiagnostics(vpa, merchant, amount, note, uri) {
+            // Check 1: VPA format
+            const vpaCheck = validateVPA(vpa);
+            setDiagCard('vpa', vpaCheck.valid ? 'PASS' : 'FAIL', 
+                vpaCheck.valid ? "Valid UPI VPA ID structure. Scanners will resolve to the target bank node." : vpaCheck.message);
+
+            // Check 2: URI Encoding
+            const hasSpace = merchant.includes(' ') || note.includes(' ');
+            const hasSpecial = /[^\w\s@.-]/.test(merchant) || /[^\w\s@.-]/.test(note);
+            
+            if (uri.includes('%20') || uri.includes('%26') || uri.includes('%3F') || uri.includes('%3D')) {
+                setDiagCard('encoding', 'PASS', "Parameters containing spaces or special characters are safely percent-encoded (RFC 3986).");
+            } else if (hasSpace || hasSpecial) {
+                setDiagCard('encoding', 'WARN', "Spaces detected. Scanners might parse values incorrectly if not properly encoded. Check output URI.");
+            } else {
+                setDiagCard('encoding', 'PASS', "No complex parameters needing encoding detected. URI complies with UPI specifications.");
+            }
+
+            // Check 3: Special Characters
+            const breakChars = /[?&=]/;
+            const rawVpaBreaks = breakChars.test(vpa);
+            const rawMerchantBreaks = breakChars.test(merchant);
+            const rawNoteBreaks = breakChars.test(note);
+
+            if (rawVpaBreaks) {
+                setDiagCard('special', 'FAIL', "UPI ID contains reserved characters (? & =). This will break URL query string formatting.");
+            } else if (rawMerchantBreaks || rawNoteBreaks) {
+                setDiagCard('special', 'WARN', "Merchant or Note contains raw special characters. Although encoded in URI, some older scanners might fail.");
+            } else {
+                setDiagCard('special', 'PASS', "Inputs free of URL breaking characters. Ready for reliable scanning across all apps.");
+            }
+
+            // Check 4: Error Correction
+            const payloadLen = uri.length;
+            const selectedEcc = elQrEcc.value;
+            if (payloadLen > 120 && (selectedEcc === 'L' || selectedEcc === 'M')) {
+                setDiagCard('ecc', 'WARN', `High payload length (${payloadLen} chars). Recommending ECC level 'Q' or 'H' to improve scan reliability on damaged screens.`);
+            } else {
+                setDiagCard('ecc', 'PASS', `Optimal density. Payload is ${payloadLen} characters. Level '${selectedEcc}' provides sufficient scan backup.`);
+            }
+
+            // Check 5: Color Contrast & Size
+            const fgHex = elQrColor.value;
+            const bgHex = '#ffffff';
+            const contrast = calculateContrast(fgHex, bgHex);
+            
+            if (contrast < 3.0) {
+                setDiagCard('contrast', 'FAIL', `Critical: Low color contrast ratio (${contrast.toFixed(1)}:1). Scanners will fail to identify the grid.`);
+            } else if (contrast < 4.5) {
+                setDiagCard('contrast', 'WARN', `Suboptimal contrast ratio (${contrast.toFixed(1)}:1). Scanners might lag under low light.`);
+            } else {
+                setDiagCard('contrast', 'PASS', `Excellent contrast ratio (${contrast.toFixed(1)}:1). QR pattern stands out clearly.`);
+            }
+
+            // Check 6: Decline Risk Check
+            const isTestVPA = vpa.toLowerCase().includes('@unitype');
+            const amtNum = parseFloat(amount);
+            
+            if (isTestVPA) {
+                setDiagCard('decline', 'FAIL', "Private test handle '@unitype' detected. It is not routable on the public switch, causing 'Transaction declined'. Use a standard handle (e.g. @okaxis) for real transactions.");
+            } else if (!isNaN(amtNum) && amtNum > 2000) {
+                setDiagCard('decline', 'WARN', "Amount exceeds ₹2,000. Security rules on unverified dynamic QRs may trigger declines. Try removing the amount if issues occur.");
+            } else {
+                setDiagCard('decline', 'PASS', "Low risk. Ensure the target UPI ID is fully linked and active.");
+            }
+        }
+
+        function runFailedDiagnostics(vpaRes, merchantRes, amountRes, noteRes) {
+            setDiagCard('vpa', vpaRes.valid ? 'PASS' : 'FAIL', vpaRes.message || "Invalid VPA format.");
+            setDiagCard('encoding', 'FAIL', "Unable to check encoding until inputs are valid.");
+            setDiagCard('special', 'FAIL', "Unable to check characters until inputs are valid.");
+            setDiagCard('ecc', 'FAIL', "Unable to calculate density until URI is built.");
+            setDiagCard('contrast', 'PASS', "Color options check active.");
+            setDiagCard('decline', 'FAIL', "Unable to check decline risks until inputs are valid.");
+        }
+
+        function setDiagCard(id, status, text) {
+            const cardEl = document.getElementById(`diag-${id}-status`);
+            const descEl = document.getElementById(`diag-${id}-desc`);
+            
+            cardEl.innerText = status;
+            cardEl.className = 'diag-status';
+
+            if (status === 'PASS') {
+                cardEl.classList.add('status-pass');
+            } else if (status === 'WARN') {
+                cardEl.classList.add('status-warn');
+            } else {
+                cardEl.classList.add('status-fail');
+            }
+
+            descEl.innerText = text;
+        }
+
+        // Relative luminance formula (W3C WCAG 2.0)
+        function calculateContrast(hex1, hex2) {
+            const getRGB = (hex) => {
+                const color = hex.replace('#', '');
+                const r = parseInt(color.substring(0, 2), 16) / 255;
+                const g = parseInt(color.substring(2, 4), 16) / 255;
+                const b = parseInt(color.substring(4, 6), 16) / 255;
+                return [r, g, b].map(v => {
+                    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+                });
+            };
+
+            const [r1, g1, b1] = getRGB(hex1);
+            const [r2, g2, b2] = getRGB(hex2);
+
+            const l1 = 0.2126 * r1 + 0.7152 * g1 + 0.0722 * b1;
+            const l2 = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2;
+
+            const brightest = Math.max(l1, l2);
+            const darkest = Math.min(l1, l2);
+
+            return (brightest + 0.05) / (darkest + 0.05);
+        }
+
+        // === ACTIONS: DOWNLOAD & CLIPBOARD ===
+        function downloadPNG() {
+            const vpaVal = elUpiId.value.trim();
+            const merchantVal = elMerchantName.value.trim();
+            const amountVal = elAmount.value.trim();
+            const noteVal = elNote.value.trim();
+
+            if (!validateVPA(vpaVal).valid || !validateMerchant(merchantVal).valid) {
+                showToast("Cannot download QR: Ensure VPA and Merchant Name are valid.", "error");
+                return;
+            }
+
+            const upiURI = buildUPIURI(vpaVal, merchantVal, amountVal, noteVal);
+
+            // Build a high-resolution print canvas off-screen
+            const downloadCanvas = document.createElement('canvas');
+            downloadCanvas.width = 1024;
+            downloadCanvas.height = 1024;
+            const eccLevel = elQrEcc.value;
+            const fgColor = elQrColor.value;
+
+            try {
+                if (typeof QRious !== 'undefined') {
+                    // Create temporary QRious instance for the download canvas
+                    new QRious({
+                        element: downloadCanvas,
+                        size: 1024,
+                        level: eccLevel,
+                        value: upiURI,
+                        background: '#ffffff',
+                        foreground: fgColor
+                    });
+
+                    // Download file
+                    triggerDownload(downloadCanvas.toDataURL("image/png"), `upi-qr-${merchantVal.replace(/\s+/g, '-')}.png`);
+                    showToast("High-resolution QR code PNG downloaded successfully!", "success");
+                } else {
+                    // Fallback using the standard on-screen canvas export if library behaves weirdly
+                    triggerDownload(elCanvas.toDataURL("image/png"), `upi-qr-${merchantVal.replace(/\s+/g, '-')}.png`);
+                    showToast("QR downloaded from preview canvas.", "success");
+                }
+            } catch (err) {
+                console.error("Download failed:", err);
+                showToast("Download failed. Copy the URI or check browser settings.", "error");
+            }
+        }
+
+        function triggerDownload(dataUrl, name) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyURI() {
+            const vpaVal = elUpiId.value.trim();
+            const merchantVal = elMerchantName.value.trim();
+            const amountVal = elAmount.value.trim();
+            const noteVal = elNote.value.trim();
+
+            if (!validateVPA(vpaVal).valid || !validateMerchant(merchantVal).valid) {
+                showToast("Invalid inputs: Cannot copy payment URI.", "error");
+                return;
+            }
+
+            const upiURI = buildUPIURI(vpaVal, merchantVal, amountVal, noteVal);
+            navigator.clipboard.writeText(upiURI).then(() => {
+                showToast("UPI Payment URI copied to clipboard!", "success");
+            }).catch(err => {
+                console.error("Clipboard copy failed:", err);
+                showToast("Failed to copy URI. Copy manually from details.", "error");
+            });
+        }
+
+        function copyUPI() {
+            const vpaVal = elUpiId.value.trim();
+            if (!validateVPA(vpaVal).valid) {
+                showToast("Invalid VPA format: Cannot copy.", "error");
+                return;
+            }
+
+            navigator.clipboard.writeText(vpaVal).then(() => {
+                showToast("UPI VPA copied to clipboard!", "success");
+            }).catch(err => {
+                console.error("Clipboard copy failed:", err);
+                showToast("Failed to copy VPA.", "error");
+            });
+        }
+
+        function payWithUpiApp() {
+            const vpaVal = elUpiId.value.trim();
+            const merchantVal = elMerchantName.value.trim();
+            const amountVal = elAmount.value.trim();
+            const noteVal = elNote.value.trim();
+
+            if (!validateVPA(vpaVal).valid || !validateMerchant(merchantVal).valid) {
+                showToast("Invalid inputs: Cannot initiate payment.", "error");
+                return;
+            }
+
+            const upiURI = buildUPIURI(vpaVal, merchantVal, amountVal, noteVal);
+            showToast("Launching UPI payment app...", "success");
+            window.location.href = upiURI;
+        }
+
+        // === TOAST ENGINE ===
+        function showToast(message, type = "success") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            
+            const icon = type === 'success' ? 
+                `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>` : 
+                `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+            toast.innerHTML = `${icon} <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = "toastOut 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+                setTimeout(() => {
+                    container.removeChild(toast);
+                }, 300);
+            }, 3000);
+        }
+
+        // Add toastOut keyframes dynamically
+        const styleSheet = document.createElement("style");
+        styleSheet.innerText = `
+            @keyframes toastOut {
+                from { opacity: 1; transform: translateY(0); }
+                to { opacity: 0; transform: translateY(10px); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+
+        // ==========================================
+        // === INTERACTIVE BROWSER UNIT TEST SUITE ===
+        // ==========================================
+        const testConsole = document.getElementById('test-console');
+        const testTableBody = document.getElementById('test-table-body');
+
+        function logToConsole(text, level = 'info') {
+            const line = document.createElement('div');
+            line.className = 'test-console-line';
+            if (level === 'pass') {
+                line.style.color = '#34d399'; // Green
+                line.innerText = `[PASS] ${text}`;
+            } else if (level === 'fail') {
+                line.style.color = '#ef4444'; // Red
+                line.innerText = `[FAIL] ${text}`;
+            } else {
+                line.style.color = '#94a3b8'; // Muted Slate
+                line.innerText = `[INFO] ${text}`;
+            }
+            testConsole.appendChild(line);
+            testConsole.scrollTop = testConsole.scrollHeight;
+        }
+
+        function runUnitTests() {
+            testConsole.innerHTML = '';
+            testTableBody.innerHTML = '';
+            
+            logToConsole("Starting UPI QR Generator Module Test Suite...");
+            let passedCount = 0;
+            let failedCount = 0;
+
+            const runTest = (name, description, assertFn) => {
+                logToConsole(`Running: ${name}`);
+                try {
+                    assertFn();
+                    logToConsole(`Passed: ${name}`, 'pass');
+                    addTestResultToTable(name, description, true);
+                    passedCount++;
+                } catch (err) {
+                    logToConsole(`Failed: ${name} -> ${err.message}`, 'fail');
+                    addTestResultToTable(name, description, false, err.message);
+                    failedCount++;
+                }
+            };
+
+            // Test 1: VPA regex verification
+            runTest(
+                "VPA Format Validation", 
+                "Verifies correct format rules of UPI Virtual Payment Address (VPA).",
+                () => {
+                    const validVPAs = [
+                        'BHARATPE2Z0N0D6S7Q31896@unitype',
+                        'prajansanjayko@okaxis',
+                        'john.doe@paytm',
+                        'user_name-123@ybl'
+                    ];
+                    const invalidVPAs = [
+                        'abc', // missing @
+                        'abc@', // missing handle
+                        '@handle', // missing username
+                        'abc@handle@bank', // double @
+                        'a@b', // too short username/handle
+                        '.username@bank', // starts with dot
+                        'username.@bank', // ends with dot
+                        'user..name@bank' // consecutive dots
+                    ];
+
+                    validVPAs.forEach(vpa => {
+                        const check = validateVPA(vpa);
+                        if (!check.valid) {
+                            throw new Error(`Failed to accept valid VPA: ${vpa}. Details: ${check.message}`);
+                        }
+                    });
+
+                    invalidVPAs.forEach(vpa => {
+                        const check = validateVPA(vpa);
+                        if (check.valid) {
+                            throw new Error(`Failed to reject invalid VPA: ${vpa}`);
+                        }
+                    });
+                }
+            );
+
+            // Test 2: Merchant Name validation
+            runTest(
+                "Merchant Name Validation",
+                "Verifies that empty/excessive merchant names are flagged.",
+                () => {
+                    const emptyCheck = validateMerchant("   ");
+                    if (emptyCheck.valid) {
+                        throw new Error("Failed to reject whitespace-only merchant name.");
+                    }
+
+                    const nullCheck = validateMerchant("");
+                    if (nullCheck.valid) {
+                        throw new Error("Failed to reject empty merchant name.");
+                    }
+
+                    const passCheck = validateMerchant("BharatPe Clinic");
+                    if (!passCheck.valid) {
+                        throw new Error("Incorrectly rejected valid merchant name.");
+                    }
+                }
+            );
+
+            // Test 3: Amount Boundary limits
+            runTest(
+                "Amount boundaries & decimals",
+                "Verifies positive float boundary, max scale of 2, and limits.",
+                () => {
+                    const invalidAmounts = ['-5.00', '0', 'abc', '10.234', '1500000.00'];
+                    const validAmounts = ['1.00', '500.5', '100000.00', ''];
+
+                    invalidAmounts.forEach(amt => {
+                        const check = validateAmount(amt);
+                        if (check.valid) {
+                            throw new Error(`Failed to reject invalid amount: ${amt}`);
+                        }
+                    });
+
+                    validAmounts.forEach(amt => {
+                        const check = validateAmount(amt);
+                        if (!check.valid) {
+                            throw new Error(`Incorrectly rejected valid amount: ${amt}. Details: ${check.message}`);
+                        }
+                    });
+                }
+            );
+
+            // Test 4: UPI Payment URI Builder correctness
+            runTest(
+                "UPI Payment URI Structure",
+                "Verifies proper generation without amount, and full params with amount/note.",
+                () => {
+                    // Scenario A: No amount, no note
+                    const uriA = buildUPIURI('BHARATPE2Z0N0D6S7Q31896@unitype', 'BharatPe', '', '');
+                    const expectedA = 'upi://pay?pa=BHARATPE2Z0N0D6S7Q31896@unitype&pn=BharatPe&cu=INR';
+                    if (uriA !== expectedA) {
+                        throw new Error(`Scenario A URI mismatch.\nGot: ${uriA}\nExpected: ${expectedA}`);
+                    }
+
+                    // Scenario B: With amount & note
+                    const uriB = buildUPIURI('BHARATPE2Z0N0D6S7Q31896@unitype', 'BharatPe', '1.00', 'Consultation Fee');
+                    const expectedB = 'upi://pay?pa=BHARATPE2Z0N0D6S7Q31896@unitype&pn=BharatPe&cu=INR&am=1.00&tn=Consultation%20Fee';
+                    if (uriB !== expectedB) {
+                        throw new Error(`Scenario B URI mismatch.\nGot: ${uriB}\nExpected: ${expectedB}`);
+                    }
+                }
+            );
+
+            // Test 5: Parameter Percent-Encoding
+            runTest(
+                "Parameter Percent-Encoding",
+                "Verifies RFC-3986 encoding for special chars and spaces in Merchant & Note.",
+                () => {
+                    const uri = buildUPIURI('test@okaxis', 'A & B Clinic', '', 'Fee = 100?');
+                    if (uri.includes(' ') || uri.includes('&') && !uri.includes('pa=')) {
+                        if (uri.includes('pn=A & B') || uri.includes('tn=Fee = 100?')) {
+                            throw new Error(`Unencoded parameters detected in: ${uri}`);
+                        }
+                    }
+                    if (!uri.includes('pn=A%20%26%20B%20Clinic') || !uri.includes('tn=Fee%20%3D%20100%3F')) {
+                        throw new Error(`Incorrect percent-encoding. Got: ${uri}`);
+                    }
+                }
+            );
+
+            // Test 6: Color Contrast calculation bounds
+            runTest(
+                "Contrast calculation accuracy",
+                "Verifies luminance and contrast ratio bounds against WCAG rules.",
+                () => {
+                    const blackWhiteContrast = calculateContrast('#000000', '#ffffff');
+                    if (Math.round(blackWhiteContrast) !== 21) {
+                        throw new Error(`Expected Black/White contrast to be 21:1. Got: ${blackWhiteContrast}`);
+                    }
+
+                    const greyGreyContrast = calculateContrast('#888888', '#888888');
+                    if (Math.round(greyGreyContrast) !== 1) {
+                        throw new Error(`Expected identical color contrast to be 1:1. Got: ${greyGreyContrast}`);
+                    }
+                }
+            );
+
+            logToConsole(`Tests completed: ${passedCount} passed, ${failedCount} failed.`, failedCount > 0 ? 'fail' : 'pass');
+            showToast(`Test Run Finished: ${passedCount}/${passedCount+failedCount} Passed`, failedCount > 0 ? "error" : "success");
+        }
+
+        function addTestResultToTable(name, desc, passed, errorText = "") {
+            const tr = document.createElement('tr');
+            
+            const tdName = document.createElement('td');
+            tdName.innerHTML = `<strong>${name}</strong>`;
+            
+            const tdDesc = document.createElement('td');
+            tdDesc.innerText = desc;
+            
+            const tdStatus = document.createElement('td');
+            if (passed) {
+                tdStatus.innerHTML = `<span class="diag-status status-pass">PASS</span>`;
+            } else {
+                tdStatus.innerHTML = `<span class="diag-status status-fail" title="${errorText.replace(/"/g, '&quot;')}">FAIL</span>`;
+            }
+            
+            tr.appendChild(tdName);
+            tr.appendChild(tdDesc);
+            tr.appendChild(tdStatus);
+            testTableBody.appendChild(tr);
+        }
+    </script>
+</body>
+</html>

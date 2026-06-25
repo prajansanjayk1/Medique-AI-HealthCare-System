@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediQue — Firebase Setup & Seed Data</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      min-height: 100vh;
+      color: #e2e8f0;
+      padding: 24px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 2rem; font-weight: 700; color: #38bdf8; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; margin-bottom: 32px; font-size: 0.9rem; }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 1rem; font-weight: 600; color: #7dd3fc; margin-bottom: 12px; }
+    .log-box {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      min-height: 200px;
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .log-line { margin: 2px 0; }
+    .log-ok { color: #4ade80; }
+    .log-err { color: #f87171; }
+    .log-info { color: #94a3b8; }
+    .log-warn { color: #fbbf24; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    .btn-primary { background: #0ea5e9; color: white; }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-success { background: #10b981; color: white; }
+    .btn-success:hover { background: #059669; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-warning:hover { background: #d97706; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .status-item {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+    }
+    .status-item .label { color: #94a3b8; margin-bottom: 2px; }
+    .status-item .value { font-weight: 600; color: #e2e8f0; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 0.7rem; font-weight: 600; }
+    .badge-pending { background: rgba(251,191,36,0.2); color: #fbbf24; }
+    .badge-done { background: rgba(74,222,128,0.2); color: #4ade80; }
+    .badge-error { background: rgba(248,113,113,0.2); color: #f87171; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    hr { border-color: rgba(255,255,255,0.08); margin: 20px 0; }
+    #auth-section { margin-bottom: 24px; }
+    input[type="email"], input[type="password"] {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      outline: none;
+      width: 240px;
+    }
+    input::placeholder { color: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏥 MediQue Firebase Setup</h1>
+    <p class="subtitle">Project: <strong>medique-b29ee</strong> — Firestore Seed Data, Authentication Setup & Verification</p>
+
+    <div class="card" id="auth-section">
+      <h2>🔐 Admin Authentication</h2>
+      <input type="email" id="admin-email" placeholder="Admin Email" value="prajansanjayko@gmail.com" />
+      <input type="password" id="admin-password" placeholder="Admin Password (min 6 chars)" />
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="doLogin()">Sign In as Admin</button>
+        <button class="btn" id="btn-create-admin" onclick="createAdmin()"
+          style="display:none; background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border:none;">
+          ➕ Create Admin Account
+        </button>
+      </div>
+      <div id="auth-status" style="margin-top: 8px; font-size: 0.82rem; color: #94a3b8;">Not signed in</div>
+      <div style="margin-top:8px; font-size:0.78rem; color:#64748b; padding:8px; background:rgba(245,158,11,0.08); border-radius:8px; border:1px solid rgba(245,158,11,0.2);">
+        💡 <strong>First time?</strong> If sign-in fails, click <em>"Create Admin Account"</em> to register this email as the admin for this Firebase project.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-header">
+        <h2>🚀 Seed Data Setup</h2>
+        <div>
+          <button class="btn btn-success" onclick="runAllSetup()" id="btn-run-all">▶ Run Full Setup</button>
+          <button class="btn btn-warning" onclick="verifyCollections()">🔍 Verify Only</button>
+        </div>
+      </div>
+      <div class="status-grid" id="status-grid">
+        <div class="status-item"><div class="label">tokenCounter</div><div class="value"><span class="badge badge-pending" id="st-token">Pending</span></div></div>
+        <div class="status-item"><div class="label">clinicStatus</div><div class="value"><span class="badge badge-pending" id="st-status">Pending</span></div></div>
+        <div class="status-item"><div class="label">clinicSettings</div><div class="value"><span class="badge badge-pending" id="st-settings">Pending</span></div></div>
+        <div class="status-item"><div class="label">staff collection</div><div class="value"><span class="badge badge-pending" id="st-staff">Pending</span></div></div>
+        <div class="status-item"><div class="label">ml_models</div><div class="value"><span class="badge badge-pending" id="st-ml">Pending</span></div></div>
+        <div class="status-item"><div class="label">queue meta</div><div class="value"><span class="badge badge-pending" id="st-queue">Pending</span></div></div>
+        <div class="status-item"><div class="label">appointments meta</div><div class="value"><span class="badge badge-pending" id="st-appts">Pending</span></div></div>
+        <div class="status-item"><div class="label">FCM tokens collection</div><div class="value"><span class="badge badge-pending" id="st-fcm">Pending</span></div></div>
+      </div>
+      <hr/>
+      <div class="log-box" id="log-box">
+        <div class="log-line log-info">Ready. Sign in and click "Run Full Setup" to initialize Firestore.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔑 Authentication Providers Status</h2>
+      <button class="btn btn-primary" onclick="checkAuth()">Check Auth Status</button>
+      <div id="auth-providers-log" style="margin-top: 12px; font-size: 0.82rem; color: #94a3b8;">Click to check...</div>
+    </div>
+
+    <div class="card">
+      <h2>📊 Firestore Collection Inspector</h2>
+      <button class="btn btn-primary" onclick="inspectCollections()">Inspect All Collections</button>
+      <div class="log-box" id="inspect-log" style="margin-top: 12px;">
+        <div class="log-line log-info">Click to inspect current Firestore collections...</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBmhvep0QM24Mf3SesIital2CCETmlsJ-4",
+      authDomain: "medique-b29ee.firebaseapp.com",
+      projectId: "medique-b29ee",
+      storageBucket: "medique-b29ee.firebasestorage.app",
+      messagingSenderId: "16979338752",
+      appId: "1:16979338752:web:1d4ca34fb54fdad6b55ae5",
+      measurementId: "G-PH4EKPV5NL"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const APP_ID = "medique-b29ee";
+
+    // ─── Logging helpers ───────────────────────────────────────────────────────
+    function log(msg, type = 'info') {
+      const box = document.getElementById('log-box');
+      const line = document.createElement('div');
+      line.className = `log-line log-${type}`;
+      const ts = new Date().toLocaleTimeString();
+      line.textContent = `[${ts}] ${msg}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+      console.log(`[${type.toUpperCase()}] ${msg}`);
+    }
+
+    function setStatus(id, state) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = `badge badge-${state === 'done' ? 'done' : state === 'error' ? 'error' : 'pending'}`;
+      el.textContent = state === 'done' ? '✓ Done' : state === 'error' ? '✗ Error' : 'Pending';
+    }
+
+    // ─── Auth ─────────────────────────────────────────────────────────────────
+    onAuthStateChanged(auth, user => {
+      const el = document.getElementById('auth-status');
+      if (user) {
+        el.innerHTML = `✅ Signed in as <strong>${user.email}</strong> (${user.uid})`;
+        el.style.color = '#4ade80';
+      } else {
+        el.textContent = 'Not signed in';
+        el.style.color = '#94a3b8';
+      }
+    });
+
+    window.doLogin = async function() {
+      const email = document.getElementById('admin-email').value.trim();
+      const password = document.getElementById('admin-password').value;
+      if (!email || !password) { log('❌ Enter email and password first.', 'err'); return; }
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        log(`✅ Signed in as ${email}`, 'ok');
+      } catch (e) {
+        // Account doesn't exist yet in this project → offer to create
+        if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found') {
+          log(`⚠️ No account found for ${email}. Click "Create Admin Account" to register.`, 'warn');
+          document.getElementById('btn-create-admin').style.display = 'inline-flex';
+        } else {
+          log(`❌ Sign-in failed: ${e.message}`, 'err');
+        }
+      }
+    };
+
+    window.createAdmin = async function() {
+      const email = document.getElementById('admin-email').value.trim();
+      const password = document.getElementById('admin-password').value;
+      if (!email || !password) { log('❌ Enter email and password first.', 'err'); return; }
+      if (password.length < 6) { log('❌ Password must be at least 6 characters.', 'err'); return; }
+      try {
+        log(`Creating admin account for ${email}...`, 'info');
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        log(`✅ Admin account created & signed in as ${email} (${cred.user.uid})`, 'ok');
+        document.getElementById('btn-create-admin').style.display = 'none';
+        log('👆 Now click "Run Full Setup" to initialize Firestore.', 'info');
+      } catch (e) {
+        if (e.code === 'auth/email-already-in-use') {
+          log('❌ Account already exists but password is wrong. Try a different password.', 'err');
+        } else if (e.code === 'auth/weak-password') {
+          log('❌ Password too weak — use at least 6 characters.', 'err');
+        } else {
+          log(`❌ Create account failed: ${e.message}`, 'err');
+        }
+      }
+    };
+
+    // ─── Firestore helpers ────────────────────────────────────────────────────
+    async function setIfNotExists(docRef, data) {
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) {
+        await setDoc(docRef, data);
+        return 'created';
+      }
+      return 'existed';
+    }
+
+    // ─── Full Setup ───────────────────────────────────────────────────────────
+    window.runAllSetup = async function() {
+      const user = auth.currentUser;
+      if (!user) { log('❌ Please sign in first!', 'err'); return; }
+
+      document.getElementById('btn-run-all').disabled = true;
+      log('═══ Starting Full Firestore Setup for medique-b29ee ═══', 'info');
+
+      const baseArtifact = `artifacts/${APP_ID}`;
+      const pubData = `${baseArtifact}/public/data`;
+
+      // 1. Token Counter
+      try {
+        log('Setting up tokenCounter...', 'info');
+        const tokenRef = doc(db, `${baseArtifact}/public/data/meta/tokenCounter`);
+        const r = await setIfNotExists(tokenRef, {
+          count: 0, lastReset: new Date().toISOString().split('T')[0],
+          prefix: 'T', updatedAt: serverTimestamp()
+        });
+        log(`✅ tokenCounter: ${r}`, 'ok');
+        setStatus('st-token', 'done');
+      } catch (e) { log(`❌ tokenCounter: ${e.message}`, 'err'); setStatus('st-token', 'error'); }
+
+      // 2. Clinic Status / Daily Pass
+      try {
+        log('Setting up clinicStatus...', 'info');
+        const today = new Date().toISOString().split('T')[0];
+        const pass = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const statusRef = doc(db, `${pubData}/meta/status`);
+        const r = await setIfNotExists(statusRef, {
+          isOpen: true, date: today, passcode: pass,
+          openedAt: serverTimestamp(), closedAt: null,
+          queueFrozen: false, emergencyMode: false
+        });
+        log(`✅ clinicStatus: ${r} (passcode: ${pass})`, 'ok');
+        setStatus('st-status', 'done');
+
+        // Also set clinicStatus/status path used in some places
+        const clinicStatusRef = doc(db, `${pubData}/clinicStatus/status`);
+        await setIfNotExists(clinicStatusRef, { isOpen: true, date: today, passcode: pass });
+      } catch (e) { log(`❌ clinicStatus: ${e.message}`, 'err'); setStatus('st-status', 'error'); }
+
+      // 3. Clinic Settings
+      try {
+        log('Setting up clinicSettings...', 'info');
+        const settingsRef = doc(db, `${pubData}/clinicSettings/config`);
+        const r = await setIfNotExists(settingsRef, {
+          clinicName: 'MediQue Clinic',
+          upiId: '',
+          avgConsultationTime: 8,
+          maxQueueSize: 100,
+          geofenceLat: null,
+          geofenceLng: null,
+          geofenceRadius: 200,
+          currency: 'INR',
+          timezone: 'Asia/Kolkata',
+          whatsappEnabled: false,
+          smsEnabled: false,
+          fcmEnabled: true,
+          createdAt: serverTimestamp()
+        });
+        log(`✅ clinicSettings: ${r}`, 'ok');
+        setStatus('st-settings', 'done');
+      } catch (e) { log(`❌ clinicSettings: ${e.message}`, 'err'); setStatus('st-settings', 'error'); }
+
+      // 4. Staff placeholder (admin user)
+      try {
+        log('Setting up admin staff record...', 'info');
+        const staffRef = doc(db, `${pubData}/staff/${user.uid}`);
+        const r = await setIfNotExists(staffRef, {
+          name: 'Admin',
+          email: user.email,
+          role: 'receptionist',
+          isActive: true,
+          specialty: 'General',
+          phone: '',
+          language: 'en',
+          createdAt: serverTimestamp()
+        });
+        log(`✅ staff record: ${r}`, 'ok');
+        setStatus('st-staff', 'done');
+      } catch (e) { log(`❌ staff: ${e.message}`, 'err'); setStatus('st-staff', 'error'); }
+
+      // 5. ML Models
+      try {
+        log('Setting up ML model baseline...', 'info');
+        const mlRef = doc(db, `${pubData}/ml_models/wait_time`);
+        const r = await setIfNotExists(mlRef, {
+          version: '1.0.0',
+          slope: 8.0,
+          intercept: 2.0,
+          sampleCount: 0,
+          lastTrainedAt: null,
+          accuracy: null,
+          isReady: false,
+          createdAt: serverTimestamp()
+        });
+        log(`✅ ml_models/wait_time: ${r}`, 'ok');
+        setStatus('st-ml', 'done');
+      } catch (e) { log(`❌ ml_models: ${e.message}`, 'err'); setStatus('st-ml', 'error'); }
+
+      // 6. Queue meta placeholder
+      try {
+        log('Setting up queue meta...', 'info');
+        const queueMetaRef = doc(db, `${pubData}/meta/queueMeta`);
+        const r = await setIfNotExists(queueMetaRef, {
+          totalToday: 0,
+          lastTokenNumber: 0,
+          avgWaitTime: 0,
+          updatedAt: serverTimestamp()
+        });
+        log(`✅ queueMeta: ${r}`, 'ok');
+        setStatus('st-queue', 'done');
+      } catch (e) { log(`❌ queueMeta: ${e.message}`, 'err'); setStatus('st-queue', 'error'); }
+
+      // 7. Appointments placeholder meta
+      try {
+        log('Setting up appointments meta...', 'info');
+        const apptMetaRef = doc(db, `${pubData}/meta/appointmentsMeta`);
+        const r = await setIfNotExists(apptMetaRef, {
+          totalToday: 0,
+          totalThisMonth: 0,
+          updatedAt: serverTimestamp()
+        });
+        log(`✅ appointmentsMeta: ${r}`, 'ok');
+        setStatus('st-appts', 'done');
+      } catch (e) { log(`❌ appointmentsMeta: ${e.message}`, 'err'); setStatus('st-appts', 'error'); }
+
+      // 8. FCM token index placeholder
+      try {
+        log('Setting up FCM index...', 'info');
+        const fcmRef = doc(db, `${pubData}/meta/fcmMeta`);
+        const r = await setIfNotExists(fcmRef, {
+          totalTokens: 0,
+          updatedAt: serverTimestamp()
+        });
+        log(`✅ fcmMeta: ${r}`, 'ok');
+        setStatus('st-fcm', 'done');
+      } catch (e) { log(`❌ fcmMeta: ${e.message}`, 'err'); setStatus('st-fcm', 'error'); }
+
+      log('═══ Setup Complete ═══', 'ok');
+      document.getElementById('btn-run-all').disabled = false;
+    };
+
+    // ─── Verify ───────────────────────────────────────────────────────────────
+    window.verifyCollections = async function() {
+      const user = auth.currentUser;
+      if (!user) { log('❌ Please sign in first!', 'err'); return; }
+
+      log('Verifying collections...', 'info');
+      const checks = [
+        { id: 'st-token', path: `artifacts/${APP_ID}/public/data/meta/tokenCounter` },
+        { id: 'st-status', path: `artifacts/${APP_ID}/public/data/meta/status` },
+        { id: 'st-settings', path: `artifacts/${APP_ID}/public/data/clinicSettings/config` },
+        { id: 'st-staff', path: `artifacts/${APP_ID}/public/data/staff/${user.uid}` },
+        { id: 'st-ml', path: `artifacts/${APP_ID}/public/data/ml_models/wait_time` },
+        { id: 'st-queue', path: `artifacts/${APP_ID}/public/data/meta/queueMeta` },
+        { id: 'st-appts', path: `artifacts/${APP_ID}/public/data/meta/appointmentsMeta` },
+        { id: 'st-fcm', path: `artifacts/${APP_ID}/public/data/meta/fcmMeta` },
+      ];
+
+      for (const check of checks) {
+        try {
+          const snap = await getDoc(doc(db, check.path));
+          if (snap.exists()) {
+            log(`✅ EXISTS: ${check.path}`, 'ok');
+            setStatus(check.id, 'done');
+          } else {
+            log(`⚠️ MISSING: ${check.path}`, 'warn');
+            setStatus(check.id, 'error');
+          }
+        } catch (e) {
+          log(`❌ ERROR checking ${check.path}: ${e.message}`, 'err');
+          setStatus(check.id, 'error');
+        }
+      }
+      log('Verification complete.', 'info');
+    };
+
+    // ─── Auth Check ───────────────────────────────────────────────────────────
+    window.checkAuth = function() {
+      const el = document.getElementById('auth-providers-log');
+      const user = auth.currentUser;
+      if (user) {
+        el.innerHTML = `
+          <div style="color:#4ade80">✅ Auth is operational</div>
+          <div style="color:#94a3b8; margin-top:4px;">Current user: <strong style="color:#e2e8f0">${user.email}</strong></div>
+          <div style="color:#94a3b8">UID: ${user.uid}</div>
+          <div style="color:#94a3b8; margin-top:8px;">Email/Password provider is enabled and working correctly.</div>
+          <div style="color:#64748b; margin-top:4px; font-size:0.78rem;">To enable more providers (Google, Phone), visit Firebase Console → Authentication → Sign-in method</div>
+        `;
+      } else {
+        el.innerHTML = `<div style="color:#fbbf24">⚠️ Not signed in. Sign in above to verify auth is working.</div>`;
+      }
+    };
+
+    // ─── Inspector ────────────────────────────────────────────────────────────
+    window.inspectCollections = async function() {
+      const user = auth.currentUser;
+      const ilog = document.getElementById('inspect-log');
+      ilog.innerHTML = '';
+
+      function iline(msg, type='info') {
+        const d = document.createElement('div');
+        d.className = `log-line log-${type}`;
+        d.textContent = msg;
+        ilog.appendChild(d);
+      }
+
+      if (!user) { iline('❌ Please sign in first!', 'err'); return; }
+
+      iline('Inspecting Firestore structure...', 'info');
+
+      const paths = [
+        `artifacts/${APP_ID}/public/data/meta/tokenCounter`,
+        `artifacts/${APP_ID}/public/data/meta/status`,
+        `artifacts/${APP_ID}/public/data/clinicStatus/status`,
+        `artifacts/${APP_ID}/public/data/clinicSettings/config`,
+        `artifacts/${APP_ID}/public/data/ml_models/wait_time`,
+        `artifacts/${APP_ID}/public/data/meta/queueMeta`,
+      ];
+
+      for (const path of paths) {
+        try {
+          const snap = await getDoc(doc(db, path));
+          if (snap.exists()) {
+            const data = snap.data();
+            iline(`✅ ${path.split('/').pop()} → ${JSON.stringify(data).substring(0, 80)}...`, 'ok');
+          } else {
+            iline(`⬜ ${path.split('/').pop()} → (document not found)`, 'warn');
+          }
+        } catch (e) {
+          iline(`❌ ${path.split('/').pop()} → ${e.message}`, 'err');
+        }
+      }
+
+      // Try to count queue items
+      try {
+        const qSnap = await getDocs(collection(db, `artifacts/${APP_ID}/public/data/queue`));
+        iline(`📋 Active queue items: ${qSnap.size}`, 'info');
+      } catch (e) {
+        iline(`❌ queue: ${e.message}`, 'err');
+      }
+
+      // Try to count staff
+      try {
+        const sSnap = await getDocs(collection(db, `artifacts/${APP_ID}/public/data/staff`));
+        iline(`👨‍⚕️ Staff members: ${sSnap.size}`, 'info');
+      } catch (e) {
+        iline(`❌ staff: ${e.message}`, 'err');
+      }
+
+      // Try to count patients
+      try {
+        const pSnap = await getDocs(collection(db, `artifacts/${APP_ID}/public/data/patients`));
+        iline(`🧑‍🤝‍🧑 Patients: ${pSnap.size}`, 'info');
+      } catch (e) {
+        iline(`❌ patients: ${e.message}`, 'err');
+      }
+
+      // Try to count appointments
+      try {
+        const aSnap = await getDocs(collection(db, `artifacts/${APP_ID}/public/data/appointments`));
+        iline(`📅 Appointments: ${aSnap.size}`, 'info');
+      } catch (e) {
+        iline(`❌ appointments: ${e.message}`, 'err');
+      }
+
+      iline('═══ Inspection complete ═══', 'info');
+    };
+  </script>
+</body>
+</html>

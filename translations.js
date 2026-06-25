@@ -92,7 +92,23 @@ const translations = {
         close: "Close",
         minutes: "min",
         hours: "hr",
-        rupees: "₹"
+        rupees: "₹",
+        // Billing & Payments
+        billing_invoice_number: "Invoice Number",
+        billing_consultation_fee: "Consultation Fee",
+        billing_service_charges: "Service Charges",
+        billing_lab_tests: "Lab Tests",
+        billing_medication_charges: "Medication Charges",
+        billing_total_amount: "Total Amount",
+        billing_payment_status: "Payment Status",
+        billing_pay_now: "Pay Now",
+        billing_receipt: "Receipt",
+        
+        // Feedback
+        feedback_doctor_rating: "Doctor Rating",
+        feedback_app_rating: "App Experience",
+        feedback_submit: "Submit Feedback",
+        feedback_comments: "Add comments (optional)"
     },
     
     ta: {
@@ -185,7 +201,23 @@ const translations = {
         close: "மூடு",
         minutes: "நிமிடம்",
         hours: "மணி",
-        rupees: "₹"
+        rupees: "₹",
+        // Billing & Payments
+        billing_invoice_number: "இன்வாய்ஸ் எண்",
+        billing_consultation_fee: "ஆலோசனை கட்டணம்",
+        billing_service_charges: "சேவை கட்டணம்",
+        billing_lab_tests: "லேப் சோதனை கட்டணம்",
+        billing_medication_charges: "மருந்து கட்டணம்",
+        billing_total_amount: "மொத்த தொகை",
+        billing_payment_status: "பணம் செலுத்தும் நிலை",
+        billing_pay_now: "இப்போது செலுத்துங்கள்",
+        billing_receipt: "ரசீது",
+        
+        // Feedback
+        feedback_doctor_rating: "மருத்துவர் மதிப்பீடு",
+        feedback_app_rating: "ஆಪ್ அனுபவம்",
+        feedback_submit: "மதிப்பீட்டை சமர்ப்பி",
+        feedback_comments: "கருத்துகள் (விருப்பத்திற்குரியது)"
     },
     
     te: {
@@ -278,7 +310,23 @@ const translations = {
         close: "మూసివేయి",
         minutes: "ని",
         hours: "గం",
-        rupees: "₹"
+        rupees: "₹",
+        // Billing & Payments
+        billing_invoice_number: "ఇన్వాయిస్ సంఖ్య",
+        billing_consultation_fee: "సంప్రదింపుల రుసుము",
+        billing_service_charges: "సేవా రుసుము",
+        billing_lab_tests: "ల్యాబ్ పరీక్ష రుసుము",
+        billing_medication_charges: "ఔషధ రుసుము",
+        billing_total_amount: "మొత్తం రుసుము",
+        billing_payment_status: "చెల్లింపు స్థితి",
+        billing_pay_now: "ఇప్పుడే చెల్లించండి",
+        billing_receipt: "రసీదు",
+        
+        // Feedback
+        feedback_doctor_rating: "వైద్యుల రేటింగ్",
+        feedback_app_rating: "యాప్ అనుభவம்",
+        feedback_submit: "అభిప్రాయాన్ని సమర్పించండి",
+        feedback_comments: "వ్యాಖ್ಯలు (ఐచ్ఛಿಕం)"
     },
     
     hi: {
@@ -371,7 +419,132 @@ const translations = {
         close: "बंद करें",
         minutes: "मि",
         hours: "घं",
-        rupees: "₹"
+        rupees: "₹",
+        // Billing & Payments
+        billing_invoice_number: "चालान संख्या",
+        billing_consultation_fee: "परामर्श शुल्क",
+        billing_service_charges: "सेवा शुल्क",
+        billing_lab_tests: "लैब टेस्ट शुल्क",
+        billing_medication_charges: "दवा शुल्क",
+        billing_total_amount: "कुल राशि",
+        billing_payment_status: "भुगतान की स्थिति",
+        billing_pay_now: "अभी भुगतान करें",
+        billing_receipt: "रसीद",
+        
+        // Feedback
+        feedback_doctor_rating: "डॉक्टर रेटिंग",
+        feedback_app_rating: "ऐप अनुभव",
+        feedback_submit: "प्रतिक्रिया सबमिट करें",
+        feedback_comments: "टिप्पणी (वैकल्पिक)"
+    },
+    kn: {
+        // Navigation
+        nav_dashboard: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+        nav_appointments: "ನೇಮಕಾತಿಗಳು",
+        nav_history: "ಇತಿಹಾಸ",
+        nav_chat: "ಚಾಟ್",
+        nav_profile: "ಪ್ರೊಫೈಲ್",
+        nav_queue: "ಸರತಿ ಸಾಲು",
+        nav_settings: "ಸಂಯೋಜನೆಗಳು",
+        nav_finance: "ಹಣಕಾಸು",
+        
+        // Dashboard
+        welcome_back: "ಮರಳಿ ಸ್ವಾಗತ",
+        clinic_status: "ಕ್ಲಿನಿಕ್ ಸ್ಥಿತಿ",
+        clinic_open: "ತೆರೆದಿದೆ",
+        clinic_closed: "ಮುಚ್ಚಲಾಗಿದೆ",
+        patients_waiting: "ರೋಗಿಗಳು ಕಾಯುತ್ತಿದ್ದಾರೆ",
+        your_position: "ನಿಮ್ಮ ಸ್ಥಾನ",
+        estimated_wait: "ಅಂದಾಜು ಕಾಯುವಿಕೆ",
+        join_queue: "ಸರತಿ ಸಾಲಿಗೆ ಸೇರಿ",
+        scan_qr: "QR ಸ್ಕ್ಯಾನ್",
+        book_appointment: "ನೇಮಕಾತಿ ಕಾಯ್ದಿರಿಸಿ",
+        video_consult: "ವಿಡಿಯೋ ಸಮಾಲೋಚನೆ",
+        
+        // Queue
+        queue_position: "ಸ್ಥಾನ",
+        queue_wait_time: "ಕಾಯುವ ಸಮಯ",
+        queue_status_waiting: "ಕಾಯುತ್ತಿದೆ",
+        queue_status_current: "ನಿಮ್ಮ ಸರದಿ!",
+        leave_queue: "ಸರತಿ ಸಾಲಿನಿಂದ ಹೊರಹೋಗಿ",
+        patient_name: "ರೋಗಿಯ ಹೆಸರು",
+        mobile_number: "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ",
+        describe_issue: "ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ವಿವರಿಸಿ",
+        submit: "ಸಲ್ಲಿಸು",
+        cancel: "ರದ್ದುಮಾಡು",
+        
+        // Appointments
+        select_date: "ದಿನಾಂಕ ಆಯ್ಕೆಮಾಡಿ",
+        select_time: "ಸಮಯ ಆಯ್ಕೆಮಾಡಿ",
+        reason_for_visit: "ಭೇಟಿಯ ಕಾರಣ",
+        book_now: "ಈಗ ಕಾಯ್ದಿರಿಸಿ",
+        my_appointments: "ನನ್ನ ನೇಮಕಾತಿಗಳು",
+        upcoming: "ಮುಂಬರುವ",
+        completed: "ಪೂರ್ಣಗೊಂಡಿದೆ",
+        cancelled: "ರದ್ದಾಗಿದೆ",
+        no_appointments: "ಯಾವುದೇ ನೇಮಕಾತಿಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
+        
+        // Chat
+        type_message: "ಸಂದೇಶ ಬರೆಯಿರಿ...",
+        send: "ಕಳುಹಿಸು",
+        recording: "ರೆಕಾರ್ಡಿಂಗ್...",
+        connecting: "ಸಂದೇಶಗಳನ್ನು ಸಿಂಕ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
+        end_to_end_encrypted: "ಎಂಡ್-ಟು-ಎಂಡ್ ಗೂಢಲಿಪೀಕರಿಸಲಾಗಿದೆ",
+        secure_message: "ನಿಮ್ಮ ಸಂದೇಶಗಳು ಸುರಕ್ಷಿತವಾಗಿವೆ.",
+        today: "ಇಂದು",
+        yesterday: "ನಿನ್ನೆ",
+        available_now: "ಈಗ ಲಭ್ಯವಿದೆ",
+        
+        // History
+        visit_history: "ಭೇಟಿ ಇತಿಹಾಸ",
+        no_history: "ಯಾವುದೇ ವೈದ್ಯಕೀಯ ಇತಿಹಾಸ ಕಂಡುಬಂದಿಲ್ಲ",
+        diagnosis: "ರೋಗನಿರ್ಣಯ",
+        notes: "ಟಿಪ್ಪಣಿಗಳು",
+        fee: "ಶುಲ್ಕ",
+        
+        // Profile
+        update_profile: "ಪ್ರೊಫೈಲ್ ನವೀಕರಿಸಿ",
+        logout: "ಲಾಗ್ ಔಟ್",
+        install_app: "ಆಪ್ ಸ್ಥಾಪಿಸಿ",
+        language: "ಭಾಷೆ",
+        save: "ಉಳಿಸು",
+        
+        // Doctor Portal
+        consultations: "ಸಮಾಲೋಚನೆಗಳು",
+        active: "ಸಕ್ರಿಯ",
+        clinical_history: "ವೈದ್ಯಕೀಯ ಇತಿಹಾಸ",
+        live_consultation: "ಲೈವ್ ಸಮಾಲೋಚನೆ",
+        start_conversation: "ಸುರಕ್ಷಿತ ಸಂಭಾಷಣೆ ಪ್ರಾರಂಭಿಸಿ",
+        select_patient: "ರೋಗಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+        ready_to_consult: "ಸಮಾಲೋಚನೆಗೆ ಸಿದ್ಧ",
+        previous_visits: "ಹಿಂದಿನ ಭೇಟಿ ದಾಖಲೆಗಳು",
+        
+        // Common
+        loading: "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+        error: "ದೋಷ",
+        success: "ಯಶಸ್ಸು",
+        confirm: "ದೃಢೀಕರಿಸಿ",
+        close: "ಮುಚ್ಚು",
+        minutes: "ನಿಮಿಷ",
+        hours: "ಗಂಟೆ",
+        rupees: "₹",
+        
+        // Billing & Payments
+        billing_invoice_number: "ಇನ್‌ವಾಯ್ಸ್ ಸಂಖ್ಯೆ",
+        billing_consultation_fee: "ಸಮಾಲೋಚನೆ ಶುಲ್ಕ",
+        billing_service_charges: "ಸೇವಾ ಶುಲ್ಕ",
+        billing_lab_tests: "ಲ್ಯಾಬ್ ಪರೀಕ್ಷಾ ಶುಲ್ಕ",
+        billing_medication_charges: "ಔಷಧ ಶುಲ್ಕ",
+        billing_total_amount: "ಒಟ್ಟು ಮೊತ್ತ",
+        billing_payment_status: "ಪಾವತಿ ಸ್ಥಿತಿ",
+        billing_pay_now: "ಈಗ ಪಾವತಿಸಿ",
+        billing_receipt: "ರಸೀದಿ",
+        
+        // Feedback
+        feedback_doctor_rating: "ವೈದ್ಯರ ರೇಟಿಂಗ್",
+        feedback_app_rating: "ಆಪ್ ಅನುಭವ",
+        feedback_submit: "ಪ್ರತಿಕ್ರಿಯೆ ಸಲ್ಲಿಸಿ",
+        feedback_comments: "ಅಭಿಪ್ರಾಯಗಳು (ಐಚ್ಛಿಕ)"
     }
 };
 
@@ -388,6 +561,20 @@ function setLanguage(lang) {
     if (translations[lang]) {
         currentLang = lang;
         localStorage.setItem('mediqueue_lang', lang);
+        
+        // Sync to Firestore if authenticated & db is available
+        if (typeof window !== 'undefined' && window.auth && window.auth.currentUser && window.db && window.doc && window.setDoc) {
+            const uid = window.auth.currentUser.uid;
+            const appId = window.appId || 'queue-care-5eeea';
+            if (window.location.pathname.includes('patient.html')) {
+                const profileRef = window.doc(window.db, "artifacts", appId, "users", uid, "profile", "details");
+                window.setDoc(profileRef, { language: lang }, { merge: true }).catch(err => console.error("Firestore user lang update err", err));
+            } else {
+                const staffRef = window.doc(window.db, "artifacts", appId, "public", "data", "staff", uid);
+                window.setDoc(staffRef, { language: lang }, { merge: true }).catch(err => console.error("Firestore staff lang update err", err));
+            }
+        }
+        
         applyTranslations();
         return true;
     }
@@ -422,6 +609,10 @@ function applyTranslations() {
     if (langSelect) langSelect.value = currentLang;
     const langSelectDr = document.getElementById('lang-select-dr');
     if (langSelectDr) langSelectDr.value = currentLang;
+    const langSelectAdmin = document.getElementById('lang-select-admin');
+    if (langSelectAdmin) langSelectAdmin.value = currentLang;
+    const langSelectLogin = document.getElementById('lang-select-login');
+    if (langSelectLogin) langSelectLogin.value = currentLang;
 }
 
 // Get current language name for display
@@ -430,7 +621,8 @@ function getLanguageName(code) {
         en: 'English',
         ta: 'தமிழ்',
         te: 'తెలుగు',
-        hi: 'हिंदी'
+        hi: 'हिंदी',
+        kn: 'ಕನ್ನಡ'
     };
     return names[code] || code;
 }

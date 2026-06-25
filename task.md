@@ -1,0 +1,35 @@
+# Mediqueue Features, Wait Time Corrections, & UI Enhancements Tasks
+
+- [x] 1. Correct AI Wait Time Calculations
+  - [x] Fix status filters in average consultation time and counts streams in `db_service.dart` (include 'completed')
+  - [x] Fix local `waitTime` recalculations based on busy/offline doctor status in `patient_dashboard.dart`
+  - [x] Fix receptionist queue stream to include 'completed' today in `db_service.dart`
+  - [x] Fix `predictedWait` calculation for unassigned and busy/offline doctors in `SmartWaitEngine.recalculate()` inside `admin.html`
+  - [x] Fix patient status observer in `patient.html` to avoid listening to unassigned as a doctor
+  - [x] Fix receptionist checkout modal payment request update to set `paymentRequestStatus: 'requested'` for UPI method in `admin.html`
+- [x] 2. Enable Real WhatsApp Dispatch
+  - [x] Update `admin.html` and `patient.html` `sendSimulatedWhatsAppNotification` methods to trigger `window.open` targeting `https://wa.me/<phone>?text=<message>`
+  - [x] Update admin logs in `admin_dashboard.dart` to trigger `url_launcher` for WhatsApp
+  - [x] Auto-launch WhatsApp on UPI success in `patient_dashboard.dart`
+- [x] 3. Remove Demo/Fake Details in Doctor Profile
+  - [x] Add `updateCurrentUserLocalName` in `auth_service.dart`
+  - [x] Wrap `_DoctorProfileTab` in a `StreamBuilder` and add "Edit Profile" dialog/button to update Firestore in `doctor_dashboard.dart`
+- [x] 4. Force Real-Time Patient Feedback Collection
+  - [x] Prompt feedback dialog on clicking "Return to Home" after payment in `patient_dashboard.dart`
+- [x] 5. Display Full Patient Details in Directory Views
+  - [x] Render all demographics fields inside notes/history modal in `admin.html`
+  - [x] Update patient overlay to show demographics fields in `admin_dashboard.dart`
+- [x] 6. Add Broadcast Tab and Clinic Info Panel in Android
+  - [x] Implement `_BroadcastTab` (News Ticker + Announcements list) in `patient_dashboard.dart`
+  - [x] Add Broadcast tab to bottom navigation in `patient_dashboard.dart`
+  - [x] Render clinic operating hours and leave days in `_ProfileTab`
+  - [x] Check leaves in `_BookSlotTab` and show warning banner on leave days/days off
+- [x] 7. Login Password Eye Icon Toggle
+  - [x] Add password visibility toggles in `login_screen.dart` and `register_screen.dart`
+- [x] 8. Auto-Assign Unassigned Patients on Doctor Online
+  - [x] Add presence change assignment trigger in `admin.html`
+  - [x] Add `autoAssignUnassignedPatients` in `db_service.dart`
+  - [x] Trigger assignment on doctor online status change in `doctor_dashboard.dart`
+- [x] Verification
+  - [x] Run linting / build verification checks
+  - [x] Update walkthrough.md summary with Android Multi-language details

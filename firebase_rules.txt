@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == "prajansanjayko@gmail.com";
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // --- RULES ---
+
+    // Admin has full access to everything
+    match /{path=**} {
+      allow read, write: if isAdmin();
+    }
+
+    // Collection Group Queries for Appointments (Needed for Patient Dashboard)
+    match /{path=**}/appointments/{appointmentId} {
+      allow read: if isSignedIn() && (resource.data.patientId == request.auth.uid || isAdmin());
+    }
+
+    // ARTIFACTS COLLECTION (Main app data)
+    match /artifacts/{appId} {
+      
+      // Public Data (Queue, Appointments, Settings, etc.)
+      match /public/data/{document=**} {
+        // Patient can read clinic status, settings, etc.
+        allow read: if isSignedIn();
+        
+        // Unauthenticated can read clinic status for passcode check
+        match /clinicStatus/status {
+          allow read: if true;
+        }
+      }
+
+      // Queue Management
+      match /public/data/queue/{queueId} {
+        allow create: if isSignedIn();
+        allow read: if isSignedIn();
+        allow update: if isSignedIn() && (request.resource.data.patientId == request.auth.uid || request.resource.data.status == "cancelled" || isAdmin());
+      }
+
+      // Appointment Bookings (Direct Path)
+      match /public/data/appointments/{appointmentId} {
+        allow create: if isSignedIn();
+        allow read: if isSignedIn() && (resource.data.patientId == request.auth.uid || isAdmin());
+      }
+
+      // Chat Rooms & Messages
+      match /public/data/chatRooms/{roomId} {
+        // Patients read/write their own room (roomId is usually their UID)
+        allow read, create, update: if isSignedIn() && (roomId == request.auth.uid || resource.data.patientId == request.auth.uid || isAdmin());
+        
+        match /messages/{messageId} {
+          allow read, create: if isSignedIn() && (roomId == request.auth.uid || isAdmin());
+        }
+      }
+
+      // PATIENT SPECIFIC DATA
+      match /users/{userId} {
+        // Profile & Registration
+        match /registration/{docId} {
+          allow read, write: if isOwner(userId);
+        }
+        
+        match /profile/{docId} {
+          allow read, write: if isOwner(userId);
+        }
+        
+        // Visits / Prescriptions
+        match /visits/{visitId} {
+          allow read: if isOwner(userId) || isAdmin();
+        }
+      }
+    }
+  }
+}

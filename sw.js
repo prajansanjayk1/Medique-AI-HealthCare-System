@@ -1,4 +1,6 @@
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
 if (workbox) {
     console.log(`Workbox is loaded`);
@@ -8,7 +10,29 @@ if (workbox) {
     self.workbox.core.clientsClaim();
 
     // Cache Names
-    const CACHE_NAME = 'medique-v4-workbox';
+    const CACHE_NAME = 'medique-v6-workbox';
+    const ACTIVE_CACHES = new Set([
+        'html-cache-v2',
+        'assets-cache-v2',
+        'image-cache-v2',
+        'google-fonts-v2',
+        'firebase-sdk-v2',
+    ]);
+
+    self.addEventListener('activate', (event) => {
+        event.waitUntil(
+            caches.keys().then((keys) =>
+                Promise.all(
+                    keys.map((key) => {
+                        if (!ACTIVE_CACHES.has(key)) {
+                            return caches.delete(key);
+                        }
+                        return Promise.resolve();
+                    })
+                )
+            )
+        );
+    });
 
     // Precache crucial files - Manual precaching using Workbox routing
     // Note: In a build process, workbox-precaching would be used. 
@@ -18,7 +42,7 @@ if (workbox) {
     workbox.routing.registerRoute(
         ({request}) => request.destination === 'document',
         new workbox.strategies.NetworkFirst({
-            cacheName: 'html-cache',
+            cacheName: 'html-cache-v2',
             plugins: [
                 new workbox.expiration.ExpirationPlugin({
                     maxEntries: 10,
@@ -33,7 +57,7 @@ if (workbox) {
                        request.destination === 'style' || 
                        request.destination === 'manifest',
         new workbox.strategies.StaleWhileRevalidate({
-            cacheName: 'assets-cache',
+            cacheName: 'assets-cache-v2',
         })
     );
 
@@ -41,7 +65,7 @@ if (workbox) {
     workbox.routing.registerRoute(
         ({request}) => request.destination === 'image',
         new workbox.strategies.CacheFirst({
-            cacheName: 'image-cache',
+            cacheName: 'image-cache-v2',
             plugins: [
                 new workbox.expiration.ExpirationPlugin({
                     maxEntries: 50,
@@ -56,7 +80,7 @@ if (workbox) {
         ({url}) => url.origin === 'https://fonts.googleapis.com' || 
                    url.origin === 'https://fonts.gstatic.com',
         new workbox.strategies.CacheFirst({
-            cacheName: 'google-fonts',
+            cacheName: 'google-fonts-v2',
             plugins: [
                 new workbox.expiration.ExpirationPlugin({
                     maxEntries: 20,
@@ -70,7 +94,7 @@ if (workbox) {
     workbox.routing.registerRoute(
         ({url}) => url.origin === 'https://www.gstatic.com',
         new workbox.strategies.StaleWhileRevalidate({
-            cacheName: 'firebase-sdk',
+            cacheName: 'firebase-sdk-v2',
         })
     );
     
@@ -84,4 +108,53 @@ if (workbox) {
 
 } else {
     console.log(`Workbox didn't load`);
+}
+
+// Firebase Cloud Messaging background notifications (app closed/minimized)
+try {
+    firebase.initializeApp({
+        apiKey: "AIzaSyBmhvep0QM24Mf3SesIital2CCETmlsJ-4",
+        authDomain: "medique-b29ee.firebaseapp.com",
+        projectId: "medique-b29ee",
+        storageBucket: "medique-b29ee.firebasestorage.app",
+        messagingSenderId: "16979338752",
+        appId: "1:16979338752:web:1d4ca34fb54fdad6b55ae5",
+        measurementId: "G-PH4EKPV5NL"
+    });
+
+    const messaging = firebase.messaging();
+
+    messaging.onBackgroundMessage((payload) => {
+        const title = payload?.notification?.title || "MediQue";
+        const body = payload?.notification?.body || "Queue update available.";
+        const clickAction = payload?.data?.click_action || payload?.fcmOptions?.link || "/patient.html";
+
+        self.registration.showNotification(title, {
+            body,
+            icon: "/icon-192x192.png",
+            badge: "/icon-192x192.png",
+            tag: "medique-queue-alert",
+            renotify: true,
+            requireInteraction: true,
+            vibrate: [300, 150, 300, 150, 500],
+            data: { click_action: clickAction }
+        });
+    });
+
+    self.addEventListener("notificationclick", (event) => {
+        event.notification.close();
+        const targetUrl = event.notification?.data?.click_action || "/patient.html";
+        event.waitUntil(
+            clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+                for (const client of clientList) {
+                    if (client.url.includes("/patient.html")) {
+                        return client.focus();
+                    }
+                }
+                return clients.openWindow(targetUrl);
+            })
+        );
+    });
+} catch (err) {
+    console.warn("FCM service worker init failed:", err);
 }

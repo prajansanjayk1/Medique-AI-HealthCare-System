@@ -1,92 +1,259 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // --- HELPERS ---
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == "v.kethari@gmail.com";
+      return isSignedIn() &&
+        (
+          request.auth.token.role == "admin" ||
+          request.auth.token.email == "prajansanjayko@gmail.com" ||
+          request.auth.token.email == "prajansanjayko@gmsil.com"
+        );
     }
-    
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // --- RULES ---
-
-    // Admin has full access to everything
-    match /{path=**} {
-      allow read, write: if isAdmin();
+    function isDoctor(appId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/artifacts/$(appId)/public/data/staff/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/artifacts/$(appId)/public/data/staff/$(request.auth.uid)).data.role == "doctor";
     }
 
-    // Collection Group Queries for Appointments (Needed for Patient Dashboard & Slot Availability)
+    function isReceptionist(appId) {
+      return isSignedIn() &&
+        (
+          (
+            exists(/databases/$(database)/documents/artifacts/$(appId)/public/data/staff/$(request.auth.uid)) &&
+            get(/databases/$(database)/documents/artifacts/$(appId)/public/data/staff/$(request.auth.uid)).data.role == "receptionist"
+          ) ||
+          request.auth.token.email == "prajansanjayko@gmail.com" ||
+          request.auth.token.email == "prajansanjayko@gmsil.com"
+        );
+    }
+
+    function isStaff(appId) {
+      return isAdmin() || isDoctor(appId) || isReceptionist(appId);
+    }
+
+    function isPatientQueueOwner() {
+      return isSignedIn() && resource.data.patientId == request.auth.uid;
+    }
+
+    function queueCreateAllowed() {
+      return request.resource.data.patientId == request.auth.uid
+        && request.resource.data.status in ["pre_registered", "waiting"]
+        && request.resource.data.keys().hasOnly([
+          "name", "mobile", "issue", "patientId", "status", "source", "token",
+          "joinedAt", "priorityLabel", "priorityScore", "isEmergency",
+          "doctorId", "doctorName", "specialty", "uid", "paymentRequestStatus", "paymentMethod", "completedAt"
+        ]);
+    }
+
+    function queuePatientUpdateAllowed() {
+      return isPatientQueueOwner()
+        && request.resource.data.patientId == resource.data.patientId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "status", "joinedAt", "notified", "paymentRequestStatus", "paymentMethod", "completedAt",
+          "paymentStatus", "paymentCompletedAt", "transactionId", "upiReference", "paymentAmount", "paymentLogs"
+        ]);
+    }
+
+    function queueOwnerRejoinAllowed() {
+      return isPatientQueueOwner()
+        && request.resource.data.patientId == request.auth.uid
+        && request.resource.data.status in ["pre_registered", "waiting"]
+        && request.resource.data.keys().hasOnly([
+          "name", "mobile", "issue", "patientId", "status", "source", "token",
+          "joinedAt", "priorityLabel", "priorityScore", "isEmergency",
+          "doctorId", "doctorName", "specialty", "uid", "paymentRequestStatus", "paymentMethod", "completedAt"
+        ]);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Collection group query safety for appointments
     match /{path=**}/appointments/{appointmentId} {
       allow read: if isSignedIn();
     }
 
-    // ARTIFACTS COLLECTION (Main app data)
+    match /clinic_codes/{code} {
+      allow read: if true;
+    }
+
     match /artifacts/{appId} {
-      
-      // Public Data (Queue, Appointments, Settings, etc.)
-      match /public/data/{document=**} {
-        // Patient can read clinic status, settings, etc.
-        allow read: if isSignedIn();
-        
-        // Unauthenticated can read clinic status for passcode check
-        match /clinicStatus/status {
-          allow read: if true;
-        }
+      // Admin override for all app data (required for doctor operations across many collections)
+      match /{document=**} {
+        allow read, write: if isAdmin() || isReceptionist(appId);
       }
 
-      // Queue Management
+      // Public SaaS lead capture (no PHI here)
+      match /saas_leads/{leadId} {
+        allow create: if request.resource.data.keys().hasOnly([
+          "name", "clinic", "email", "phone", "volume", "submittedAt", "status"
+        ]);
+        allow read, update, delete: if isAdmin();
+      }
+
+      // Public trial onboarding requests
+      match /trial_signups/{trialId} {
+        allow create: if request.resource.data.keys().hasOnly([
+          "name", "clinic", "email", "phone", "teamSize", "trialPlan", "submittedAt", "status", "source"
+        ]);
+        allow read, update, delete: if isAdmin();
+      }
+
+      // Publicly needed clinic status read for passcode flow
+      match /public/data/clinicStatus/status {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      // Clinic settings are readable by authenticated users; mutable only by admin
+      match /public/data/clinicSettings/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
+
+      // Staff profiles
+      match /public/data/staff/{staffId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || isOwner(staffId);
+      }
+
+      // Queue
       match /public/data/queue/{queueId} {
-        allow create: if isSignedIn();
+        allow create: if isAdmin() || queueCreateAllowed();
         allow read: if isSignedIn();
-        allow update: if isSignedIn() && (request.resource.data.patientId == request.auth.uid || request.resource.data.status == "cancelled" || isAdmin());
+        allow update: if isAdmin() || queuePatientUpdateAllowed() || queueOwnerRejoinAllowed() || (isSignedIn() && isDoctor(appId) && resource.data.doctorId == request.auth.uid);
+        allow delete: if isAdmin();
       }
 
-      // Appointment Bookings (Direct Path)
+      // Appointments
       match /public/data/appointments/{appointmentId} {
-        allow create: if isSignedIn();
+        allow create: if isAdmin() || (isSignedIn() && request.resource.data.patientId == request.auth.uid);
         allow read: if isSignedIn();
+        allow update: if isAdmin() || (
+          isSignedIn() && 
+          resource.data.patientId == request.auth.uid && 
+          request.resource.data.patientId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"]) &&
+          request.resource.data.status in ["checked_in", "cancelled"]
+        ) || (isSignedIn() && isDoctor(appId) && resource.data.doctorId == request.auth.uid);
+        allow delete: if isAdmin();
       }
 
-      // Patients Directory (patients can update their own record)
-      match /public/data/patients/{patientId} {
+      // Broadcast channel docs in use by current app
+      match /public/data/broadcast/{docId} {
         allow read: if isSignedIn();
-        allow create, update: if isSignedIn() && patientId == request.auth.uid;
+        allow write: if isAdmin();
+      }
+
+      match /public/data/broadcast_messages/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+      }
+
+      match /public/data/whatsappLogs/{docId} {
+        allow read, write: if isStaff(appId);
+      }
+
+
+      // Finance expenses are admin-only PHI-adjacent operational data
+      match /public/data/expenses/{docId} {
+        allow read, write: if isAdmin();
+      }
+
+      // Patients directory
+      match /public/data/patients/{patientId} {
+        allow read: if isAdmin() || isDoctor(appId) || isOwner(patientId);
+        allow create, update: if isAdmin() || isDoctor(appId) || isOwner(patientId);
+        allow delete: if isAdmin();
+
+        match /{document=**} {
+          allow read, write: if isAdmin() || isDoctor(appId) || isOwner(patientId);
+        }
       }
 
       // Chat Rooms & Messages
       match /public/data/chatRooms/{roomId} {
-        // Patients read/write/update their own room (roomId is usually their UID)
-        allow read, create, update: if isSignedIn() && (roomId == request.auth.uid || resource.data.patientId == request.auth.uid || isAdmin());
-        
+        allow create: if isSignedIn() && request.resource.data.patientId == request.auth.uid;
+        allow read, update: if isAdmin() || isDoctor(appId) || (isSignedIn() && roomId == request.auth.uid);
+        allow delete: if isAdmin();
+
         match /messages/{messageId} {
-          allow read, create, update: if isSignedIn() && (roomId == request.auth.uid || isAdmin());
+          allow create, read: if isAdmin() || isDoctor(appId) || (isSignedIn() && roomId == request.auth.uid);
+          allow update: if isAdmin() || isDoctor(appId) || (isSignedIn() && roomId == request.auth.uid);
+          allow delete: if isAdmin();
+        }
+
+        // WebRTC signaling (chat calls)
+        match /webrtc/{docId} {
+          allow read, write: if isAdmin() || isDoctor(appId) || (isSignedIn() && roomId == request.auth.uid);
+
+          match /offerCandidates/{candidateId} {
+            allow read, write: if isAdmin() || isDoctor(appId) || (isSignedIn() && roomId == request.auth.uid);
+          }
+
+          match /answerCandidates/{candidateId} {
+            allow read, write: if isAdmin() || isDoctor(appId) || (isSignedIn() && roomId == request.auth.uid);
+          }
         }
       }
 
-      // PATIENT SPECIFIC DATA
+      // E2EE Public Key Registry
+      match /public/data/public_keys/{userId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin() || isOwner(userId);
+      }
+
+      // E2EE Admin Recovery Vault
+      match /public/data/admin_vault/recovery {
+        allow read, write: if isAdmin();
+      }
+
+      // App user profile tree
       match /users/{userId} {
-        // Profile & Registration
+        allow read: if isStaff(appId) || isOwner(userId);
+        allow write: if isAdmin() || isOwner(userId);
+
         match /registration/{docId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isStaff(appId) || isOwner(userId);
+          allow write: if isAdmin() || isOwner(userId);
         }
-        
+
         match /profile/{docId} {
-          allow read, write: if isOwner(userId);
+          allow read: if isStaff(appId) || isOwner(userId);
+          allow write: if isAdmin() || isOwner(userId);
         }
-        
-        // Visits / Prescriptions
+
+        match /private/{docId} {
+          allow read, write: if isAdmin() || isOwner(userId);
+        }
+
         match /visits/{visitId} {
-          allow read: if isOwner(userId) || isAdmin();
+          allow read: if isStaff(appId) || isOwner(userId);
+          allow create, update, delete: if isStaff(appId);
         }
+
+        match /notifications/{notificationId} {
+          allow read, write: if isStaff(appId) || isOwner(userId);
+        }
+      }
+
+      // Private compliance/security stores
+      match /private/{doc=**} {
+        allow read, write: if isAdmin();
       }
     }
   }
 }
+
 

@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#4f46e5" />
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="/icon-192x192.png">
     <title>MediQue - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="custom_dialogs.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: #f3f4f6;
+            background-color: #f0fdfa;
             background-image: 
-                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+                radial-gradient(at 0% 0%, hsla(174, 80%, 95%, 1) 0, transparent 50%), 
+                radial-gradient(at 50% 0%, hsla(160, 60%, 94%, 1) 0, transparent 50%), 
+                radial-gradient(at 100% 0%, hsla(190, 70%, 95%, 1) 0, transparent 50%);
             background-size: cover;
             background-attachment: fixed;
             min-height: 100vh;
@@ -77,6 +78,10 @@
         }
         
         @media (max-width: 768px) {
+            body {
+                background-attachment: scroll;
+            }
+
             /* Full-screen login on mobile */
             .glass-panel {
                 margin: 1rem;
@@ -128,38 +133,62 @@
             signInWithEmailAndPassword,
             createUserWithEmailAndPassword,
             updateProfile,
-            sendPasswordResetEmail,
             GoogleAuthProvider,
-            signInWithCredential
+            signInWithCredential,
+            sendPasswordResetEmail
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- App Configuration ---
+        // --- App Configuration (Fixed mismatch - queue-care-5eeea) ---
         const firebaseConfig = {
-          apiKey: "AIzaSyAlLK95wyvpQ-AM4ybrzldy0GIjljL79Kw",
-          authDomain: "aishwaryam-acu.firebaseapp.com",
-          projectId: "aishwaryam-acu",
-          storageBucket: "aishwaryam-acu.firebasestorage.app",
-          messagingSenderId: "465782673272",
-          appId: "1:465782673272:web:d8daadbe2f6b7308bec28d",
-          measurementId: "G-00XFE2VC97"
+            apiKey: "AIzaSyBmhvep0QM24Mf3SesIital2CCETmlsJ-4",
+            authDomain: "medique-b29ee.firebaseapp.com",
+            projectId: "medique-b29ee",
+            storageBucket: "medique-b29ee.firebasestorage.app",
+            messagingSenderId: "16979338752",
+            appId: "1:16979338752:web:1d4ca34fb54fdad6b55ae5",
+            measurementId: "G-PH4EKPV5NL"
         };
-        const ADMIN_EMAIL = "v.kethari@gmail.com";
+        const ADMIN_EMAIL = "prajansanjayko@gmail.com";
         
         // Placeholder for Google Client ID
-        const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID_HERE.apps.googleusercontent.com"; 
-
+        const GOOGLE_CLIENT_ID = ""; 
         window.onload = async () => {
             // --- PWA Service Worker Registration ---
             if ('serviceWorker' in navigator) {
                 try {
-                    await navigator.serviceWorker.register('/sw.js');
+                    const reg = await navigator.serviceWorker.register('/sw.js');
                     console.log('Service Worker registered successfully');
+                    
+                    // Listen for updates and reload politely
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                if (window.showUpdateToast) {
+                                    window.showUpdateToast(() => {
+                                        window.location.reload();
+                                    });
+                                }
+                                // Fallback: update when the user switches tabs or app goes to background
+                                document.addEventListener('visibilitychange', () => {
+                                    if (document.hidden) {
+                                        window.location.reload();
+                                    }
+                                });
+                            }
+                        });
+                    });
                 } catch (err) {
                     console.error('Service Worker registration failed:', err);
                 }
             }
 
             let auth;
+            let functions;
+            let db;
 
             // --- DOM Elements ---
             const loginView = document.getElementById('login-view');
@@ -188,19 +217,131 @@
             const registerBtn = document.getElementById('register-btn');
             const resetBtn = document.getElementById('reset-btn');
 
+            const otpView = document.getElementById('otp-view');
+            const otpForm = document.getElementById('otp-form');
+            const otpInput = document.getElementById('otp-input');
+            const verifyOtpBtn = document.getElementById('verify-otp-btn');
+            const cancelOtpBtn = document.getElementById('cancel-otp-btn');
+            const bypassOtpBtn = document.getElementById('bypass-otp-btn');
+
             const errorMsg = document.getElementById('error-msg');
             const successMsg = document.getElementById('success-msg');
+
+            let awaiting2FA = false;
+            let currentTempUser = null;
+
+            // Brute-force login protection
+            let _loginAttempts = 0;
+            let _loginLockUntil = 0;
+
+            // Helper: human-readable generic auth errors (never leak Firebase codes)
+            function friendlyAuthError(code) {
+                if (!code) return 'An error occurred. Please try again.';
+                if (code.includes('too-many-requests')) return 'Too many sign-in attempts. Please wait a moment and try again.';
+                if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Invalid email or password. Please try again.';
+                if (code.includes('user-disabled')) return 'This account has been disabled. Contact support.';
+                if (code.includes('network-request-failed')) return 'Network error. Check your internet connection.';
+                if (code.includes('email-already-in-use')) return 'An account with this email already exists.';
+                if (code.includes('weak-password')) return 'Password must be at least 8 characters.';
+                if (code.includes('invalid-email')) return 'Please enter a valid email address.';
+                return 'Sign-in failed. Please try again.';
+            }
+
+            // Helper to call OTP provider (Google Apps Script Web App with fallback to Firebase GCF)
+            async function callOtpProvider(action, payload) {
+                // REPLACE THIS with your deployed Apps Script URL, or leave blank to fall back to Firebase functions.
+                const scriptUrl = "https://script.google.com/macros/s/AKfycbx5t9TpAzpHhkvpSxDKDfRIYrcBXLtQ3jAFkAq8Qu6BzxQPU2mVZANKVcKH82LxOQxXZw/exec"; 
+                
+                if (!scriptUrl || scriptUrl.includes("YOUR_") || scriptUrl.trim() === "") {
+                    console.log("Using Firebase Cloud Functions for OTP (Requires Blaze billing plan)...");
+                    const callable = httpsCallable(functions, action === 'sendOtp' ? 'sendOtpEmail' : 'verifyOtpAndLogin');
+                    const res = await callable(payload);
+                    return res.data;
+                }
+
+                console.log("Calling Google Apps Script OTP Web App...");
+                const response = await fetch(scriptUrl.trim(), {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'text/plain'
+                    },
+                    body: JSON.stringify({
+                        action: action,
+                        ...payload
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || "Action failed");
+                }
+                return result;
+            }
+
+            // Helper to route users by role (checking staff collection in Firestore)
+            async function routeUserByRole(user) {
+                if (!user) return;
+                try {
+                    const appId = 'medique-b29ee';
+                    
+                    // Fetch staff details first to see if they are staff
+                    const staffDocRef = doc(db, `artifacts/${appId}/public/data/staff/${user.uid}`);
+                    const staffSnap = await getDoc(staffDocRef);
+                    const isStaff = staffSnap.exists();
+                    let userLang = 'en';
+                    
+                    if (isStaff) {
+                        const sData = staffSnap.data();
+                        if (sData.language) userLang = sData.language;
+                    } else {
+                        const patientRef = doc(db, `artifacts/${appId}/users/${user.uid}/profile/details`);
+                        const patientSnap = await getDoc(patientRef);
+                        if (patientSnap.exists() && patientSnap.data().language) {
+                            userLang = patientSnap.data().language;
+                        }
+                    }
+                    
+                    // Set language before redirect
+                    localStorage.setItem('mediqueue_lang', userLang);
+                    
+                    const isStaffActive = isStaff && staffSnap.data().isActive !== false;
+                    const emailClean = (user.email || "").trim().toLowerCase();
+                    const isAdmin = isStaffActive || 
+                                    emailClean === "prajansanjayko@gmail.com" || 
+                                    emailClean === "prajansanjayko@gmsil.com" || 
+                                    emailClean === "v.kethari@gmail.com";
+                                    
+                    if (isAdmin) {
+                        window.location.href = 'doctor.html';
+                    } else {
+                        window.location.href = 'patient.html';
+                    }
+                } catch (err) {
+                    console.error("Error determining user role from Firestore:", err);
+                    const emailClean = (user.email || "").trim().toLowerCase();
+                    if (emailClean === "prajansanjayko@gmail.com" || emailClean === "prajansanjayko@gmsil.com" || emailClean === "v.kethari@gmail.com") {
+                        window.location.href = 'doctor.html';
+                    } else {
+                        window.location.href = 'patient.html';
+                    }
+                }
+            }
 
             // --- Firebase Init ---
             try {
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
+                functions = getFunctions(app);
+                db = getFirestore(app);
                 await setPersistence(auth, browserLocalPersistence);
                 
                 // --- Initialize Google One Tap ---
-                if (window.google && GOOGLE_CLIENT_ID.includes("YOUR_")) {
-                    console.warn("Google Client ID is missing. One Tap will not load.");
-                } else if (window.google) {
+                if (window.google && GOOGLE_CLIENT_ID && !GOOGLE_CLIENT_ID.includes("YOUR_")) {
                     google.accounts.id.initialize({
                         client_id: GOOGLE_CLIENT_ID,
                         callback: handleCredentialResponse,
@@ -234,16 +375,39 @@
 
 
             // --- Auth Guard ---
-            onAuthStateChanged(auth, (user) => {
+            onAuthStateChanged(auth, async (user) => {
                 if (user) {
-                    // User is signed in
-                    if (user.email === ADMIN_EMAIL) {
-                        window.location.href = 'doctor.html';
+                    if (awaiting2FA) {
+                        currentTempUser = user;
+                        return;
+                    }
+                    
+                    const last2FA = localStorage.getItem(`medique_2fa_${user.uid}`);
+                    const verifiedUntil = last2FA ? Number(last2FA) : 0;
+                    const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+                    if (verifiedUntil > Date.now() && (verifiedUntil - Date.now()) < FOUR_HOURS_MS + 60000) {
+                        // User is signed in and 2FA verified today
+                        await routeUserByRole(user);
                     } else {
-                        window.location.href = 'patient.html';
+                        // Require OTP
+                        awaiting2FA = true;
+                        currentTempUser = user;
+                        
+                        loginView.style.display = 'none';
+                        registerView.style.display = 'none';
+                        resetView.style.display = 'none';
+                        if(otpView) otpView.style.display = 'block';
+                        
+                        try {
+                            await callOtpProvider('sendOtp', { email: user.email });
+                            showSuccess("A 6-digit OTP code has been sent to your email. Please check your Inbox and Spam folders.");
+                        } catch (err) {
+                            console.error(err);
+                            showError("Failed to trigger OTP email: " + err.message);
+                        }
                     }
                 }
-                // If user is null, just stay on the login page
             });
 
             // --- View Switching ---
@@ -303,6 +467,7 @@
                     if (button.id === 'login-btn') button.textContent = 'Sign In';
                     if (button.id === 'register-btn') button.textContent = 'Create Account';
                     if (button.id === 'reset-btn') button.textContent = 'Send Reset Link';
+                    if (button.id === 'verify-otp-btn') button.textContent = 'Verify & Login';
                 }
             }
 
@@ -312,17 +477,39 @@
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 hideMessages();
-                setLoading(loginBtn, true);
 
-                const email = loginEmailInput.value;
+                // ── Brute-force lockout check ──
+                if (Date.now() < _loginLockUntil) {
+                    const waitSec = Math.ceil((_loginLockUntil - Date.now()) / 1000);
+                    showError(`Too many failed attempts. Please try again in ${waitSec} seconds.`);
+                    return;
+                }
+
+                setLoading(loginBtn, true);
+                const email = loginEmailInput.value.trim().toLowerCase();
                 const password = loginPasswordInput.value;
+
+                // Clear any previous 2FA flags so we always go to the OTP screen on a fresh login
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('medique_2fa_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
 
                 try {
                     await signInWithEmailAndPassword(auth, email, password);
+                    _loginAttempts = 0; // Reset on success
                     // onAuthStateChanged will handle the redirect
                 } catch (error) {
-                    console.error("Login Error:", error);
-                    showError(error.message);
+                    console.error("Login Error:", error.code);
+                    _loginAttempts++;
+                    if (_loginAttempts >= 5) {
+                        _loginLockUntil = Date.now() + 5 * 60 * 1000; // 5-minute lockout
+                        _loginAttempts = 0;
+                        showError('Too many failed attempts. You are locked out for 5 minutes.');
+                    } else {
+                        showError(friendlyAuthError(error.code || ''));
+                    }
                 }
                 setLoading(loginBtn, false);
             });
@@ -343,16 +530,19 @@
                     return;
                 }
 
+                if (password.length < 8) {
+                    showError('Password must be at least 8 characters.');
+                    setLoading(registerBtn, false);
+                    return;
+                }
+
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                    // Now update the user's profile
-                    await updateProfile(userCredential.user, {
-                        displayName: name
-                    });
+                    await updateProfile(userCredential.user, { displayName: name });
                     // onAuthStateChanged will handle the redirect
                 } catch (error) {
-                    console.error("Register Error:", error);
-                    showError(error.message);
+                    console.error("Register Error:", error.code);
+                    showError(friendlyAuthError(error.code || ''));
                 }
                 setLoading(registerBtn, false);
             });
@@ -367,17 +557,85 @@
 
                 try {
                     await sendPasswordResetEmail(auth, email);
-                    showSuccess("Password reset link sent! Please check your email inbox.");
+                    showSuccess("If this account exists, a password reset link has been sent via Firebase.");
                 } catch (error) {
                     console.error("Reset Password Error:", error);
-                    showError(error.message);
+                    // Handle specific Firebase auth errors for better UX
+                    if (error.code === 'auth/user-not-found') {
+                        showSuccess("If this account exists, a password reset link has been sent via Firebase."); // Security best practice
+                    } else {
+                        showError(friendlyAuthError(error.code || ''));
+                    }
                 }
                 setLoading(resetBtn, false);
             });
+            
+            // --- OTP Form Logic ---
+            if(cancelOtpBtn) {
+                cancelOtpBtn.addEventListener('click', () => {
+                    auth.signOut();
+                    awaiting2FA = false;
+                    currentTempUser = null;
+                    if(otpView) otpView.style.display = 'none';
+                    loginView.style.display = 'block';
+                    hideMessages();
+                });
+            }
+
+            if(bypassOtpBtn) {
+                bypassOtpBtn.addEventListener('click', async () => {
+                    const bypassList = ['lovefornature727@gmail.com', 'prajansanjayko@gmail.com'];
+                    if (currentTempUser && currentTempUser.email && bypassList.includes(currentTempUser.email.toLowerCase())) {
+                        const verifiedUntil = Date.now() + 4 * 60 * 60 * 1000;
+                        localStorage.setItem(`medique_2fa_${currentTempUser.uid}`, String(verifiedUntil));
+                        awaiting2FA = false;
+                        await routeUserByRole(currentTempUser);
+                    } else {
+                        showError('This account is not authorized to bypass OTP.');
+                    }
+                });
+            }
+
+            if(otpForm) {
+                otpForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    hideMessages();
+                    setLoading(verifyOtpBtn, true);
+                    
+                    try {
+                        await callOtpProvider('verifyOtp', { 
+                            email: currentTempUser.email, 
+                            otp: otpInput.value.trim() 
+                        });
+                        
+                        // Store 2FA verified-until timestamp (4-hour window)
+                        const verifiedUntil = Date.now() + 4 * 60 * 60 * 1000;
+                        localStorage.setItem(`medique_2fa_${currentTempUser.uid}`, String(verifiedUntil));
+                        awaiting2FA = false;
+                        
+                        await routeUserByRole(currentTempUser);
+                    } catch (err) {
+                        console.error("OTP Error:", err);
+                        showError(err.message || "Invalid or Expired OTP.");
+                    }
+                    
+                    setLoading(verifyOtpBtn, false);
+                });
+            }
         };
     </script>
+<script src="translations.js"></script>
 </head>
 <body class="flex items-center justify-center min-h-screen p-4 sm:p-6">
+    <div class="absolute top-4 right-4 z-50">
+        <select id="lang-select-login" class="px-3 py-1.5 bg-white/90 backdrop-blur border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" onchange="setLanguage(this.value)">
+            <option value="en">🇬🇧 English</option>
+            <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+            <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+            <option value="hi">🇮🇳 हिंदी (Hindi)</option>
+            <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+        </select>
+    </div>
 
     <div class="w-full max-w-[420px] relative z-10">
         <!-- Logo and Title -->
@@ -385,8 +643,14 @@
             <div class="bg-white p-3 rounded-2xl shadow-lg mb-4">
                 <img class="h-12 w-auto" src="/logo.png" alt="MediQue Logo" onerror="this.src='https://placehold.co/100x100/4f46e5/FFFFFF?text=MQ'">
             </div>
-            <h1 class="text-3xl font-bold text-white tracking-tight">MediQue</h1>
-            <p class="text-blue-100 mt-2 text-center text-sm font-medium opacity-90">Smart Queue Management System</p>
+            <h1 class="text-3xl font-bold text-teal-950 tracking-tight">MediQue</h1>
+            <p class="text-slate-600 mt-2 text-center text-sm font-medium opacity-90">Smart Queue System for Modern Clinics</p>
+            <p class="text-slate-500 mt-1 text-center text-xs opacity-90">Designed to reduce patient waiting time by up to 60%</p>
+            <div class="mt-3 flex flex-wrap justify-center gap-2">
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-semibold">Live ETA</span>
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-semibold">Priority Queue</span>
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 font-semibold">Digital Token</span>
+            </div>
         </div>
 
         <!-- Success/Error Messages -->
@@ -400,8 +664,8 @@
         <!-- Login View -->
         <div id="login-view" class="glass-panel p-8 rounded-3xl shadow-2xl animate-fade-in">
             <div class="mb-8">
-                <h2 class="text-2xl font-bold text-gray-900">Welcome Back</h2>
-                <p class="text-gray-500 text-sm mt-1">Please sign in to continue</p>
+                <h2 class="text-2xl font-bold text-gray-900" data-i18n="welcome_back">Welcome Back</h2>
+                <p class="text-gray-500 text-sm mt-1">Sign in to manage smart queues, live ETAs, and patient flow.</p>
             </div>
             
             <form id="login-form" class="space-y-5">
@@ -416,10 +680,20 @@
                     </div>
                     <input type="password" id="login-password" class="block w-full px-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white" placeholder="••••••••" required>
                 </div>
-                
-                <button id="login-btn" type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/30 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-0.5 active:translate-y-0">
+
+                <button id="login-btn" type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/30 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-0.5 active:translate-y-0" data-i18n="confirm">
                     Sign In
                 </button>
+                
+                <!-- Quick Login Links (Bypass) -->
+                <div class="mt-4 pt-4 border-t border-gray-100 flex flex-col gap-2">
+                    <button type="button" onclick="document.getElementById('login-email').value='lovefornature727@gmail.com'; document.getElementById('login-password').value='Mridhulla12!'; document.getElementById('login-form').dispatchEvent(new Event('submit'));" class="w-full text-xs font-semibold py-2 px-3 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-lg transition-colors border border-teal-200/50">
+                        Quick Login: Doctor Panel
+                    </button>
+                    <button type="button" onclick="document.getElementById('login-email').value='prajansanjayko@gmail.com'; document.getElementById('login-password').value='Mridhulla12!'; document.getElementById('login-form').dispatchEvent(new Event('submit'));" class="w-full text-xs font-semibold py-2 px-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200/50">
+                        Quick Login: Admin Panel
+                    </button>
+                </div>
             </form>
             
             <div class="mt-8 pt-6 border-t border-gray-100 text-center">
@@ -436,7 +710,7 @@
         <div id="register-view" class="glass-panel p-8 rounded-3xl shadow-2xl animate-fade-in" style="display: none;">
             <div class="mb-8">
                 <h2 class="text-2xl font-bold text-gray-900">Create Account</h2>
-                <p class="text-gray-500 text-sm mt-1">Join MediQue for a better experience</p>
+                <p class="text-gray-500 text-sm mt-1">Join MediQue to run a faster, smarter clinic experience.</p>
             </div>
 
             <form id="register-form" class="space-y-5">
@@ -494,7 +768,106 @@
             </div>
         </div>
 
+        <!-- OTP View -->
+        <div id="otp-view" class="glass-panel p-8 rounded-3xl shadow-2xl animate-fade-in" style="display: none;">
+            <div class="mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Two-Factor Auth</h2>
+                <p class="text-gray-500 text-sm mt-1">We've sent a 6-digit code to your email.</p>
+                <!-- Warning about spam -->
+                <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                    <svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    <p class="text-xs text-yellow-700 font-medium leading-tight">Can't find it? Please check your <strong>Spam</strong> or <strong>Junk</strong> folder.</p>
+                </div>
+            </div>
+            
+            <form id="otp-form" class="space-y-6">
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider ml-1 text-center">Enter 6-Digit Code</label>
+                    <div class="flex justify-center gap-2 sm:gap-3" id="otp-inputs-container">
+                        <input type="text" maxlength="1" class="otp-box w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-black text-indigo-700 bg-white border-2 border-indigo-100 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all" required>
+                        <input type="text" maxlength="1" class="otp-box w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-black text-indigo-700 bg-white border-2 border-indigo-100 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all" required>
+                        <input type="text" maxlength="1" class="otp-box w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-black text-indigo-700 bg-white border-2 border-indigo-100 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all" required>
+                        <input type="text" maxlength="1" class="otp-box w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-black text-indigo-700 bg-white border-2 border-indigo-100 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all" required>
+                        <input type="text" maxlength="1" class="otp-box w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-black text-indigo-700 bg-white border-2 border-indigo-100 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all" required>
+                        <input type="text" maxlength="1" class="otp-box w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-black text-indigo-700 bg-white border-2 border-indigo-100 rounded-xl shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none transition-all" required>
+                    </div>
+                    <!-- Hidden input to store full code -->
+                    <input type="hidden" id="otp-input" required pattern="\d{6}">
+                </div>
+                
+                <button id="verify-otp-btn" type="submit" class="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-500/30 text-base font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-1 active:translate-y-0">
+                    Verify & Login
+                </button>
+
+                <!-- Bypass OTP button (Testing only) -->
+                <button id="bypass-otp-btn" type="button" class="w-full mt-3 text-xs font-semibold py-2.5 px-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-colors border border-red-200/50">
+                    Bypass OTP (Testing)
+                </button>
+            </form>
+            
+            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
+                <button id="cancel-otp-btn" type="button" class="text-sm font-semibold text-gray-400 hover:text-gray-700 transition-colors flex items-center justify-center mx-auto">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                    Cancel & Go Back
+                </button>
+            </div>
+        </div>
+
     </div>
+
+    <script>
+        // Enhanced UI: 6-Box OTP Auto-focus & Paste logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const boxes = document.querySelectorAll('.otp-box');
+            const hiddenInput = document.getElementById('otp-input');
+
+            const updateHiddenInput = () => {
+                let code = '';
+                boxes.forEach(b => code += b.value);
+                hiddenInput.value = code;
+            };
+
+            boxes.forEach((box, index) => {
+                box.addEventListener('input', (e) => {
+                    // Force numbers only
+                    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                    updateHiddenInput();
+                    
+                    if (e.target.value !== '' && index < boxes.length - 1) {
+                        boxes[index + 1].focus();
+                    }
+                });
+
+                box.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace') {
+                        if (box.value === '' && index > 0) {
+                            boxes[index - 1].focus();
+                            boxes[index - 1].value = '';
+                        } else {
+                            box.value = '';
+                        }
+                        updateHiddenInput();
+                    }
+                });
+
+                // Handle pasting a full 6-digit code
+                box.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    let pasted = (e.clipboardData || window.clipboardData).getData('text');
+                    pasted = pasted.replace(/[^0-9]/g, '').slice(0, 6);
+                    if(pasted.length > 0) {
+                        boxes.forEach((b, i) => {
+                            if (pasted[i]) b.value = pasted[i];
+                        });
+                        updateHiddenInput();
+                        // Focus last filled box
+                        const focusIndex = Math.min(pasted.length, 5);
+                        boxes[focusIndex].focus();
+                    }
+                });
+            });
+        });
+    </script>
 
 </body>
 </html>

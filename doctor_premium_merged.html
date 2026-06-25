@@ -19,79 +19,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <style>
-        /* --- UI Styles --- */
-        body {
-            font-family: 'Outfit', sans-serif;
-            background-color: #f3f4f6;
-            background-image: 
-                radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-                radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-                radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-            background-size: cover;
-            background-attachment: fixed;
-            min-height: 100vh;
-            color: #1f2937;
-        }
-
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-        }
-
-        .glass-nav {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s ease;
-        }
-        
-        .glass-card-dark {
-            background: rgba(17, 24, 39, 0.95);
-            color: white;
-            border-radius: 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.8); }
-
-        .nav-btn-active {
-            background-color: #4f46e5 !important;
-            color: white !important;
-        }
-
-        input, select, textarea {
-            background-color: rgba(249, 250, 251, 0.8);
-            border-color: rgba(229, 231, 235, 0.8);
-        }
-        input:focus, select:focus, textarea:focus {
-            background-color: #ffffff;
-            border-color: #6366f1;
-            ring-color: #6366f1;
-            outline: none;
-        }
-    </style>
+    <script src="custom_dialogs.js"></script>
+    <link rel="stylesheet" href="/premium-ui.css">
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -252,7 +181,7 @@
                                         <p class="text-sm text-gray-400 mt-1">Mobile: ${nextPatient.mobile}</p>
                                     </div>
                                     <div class="mt-4">
-                                        <button id="dash-call-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95">
+                                        <button id="dash-call-btn" class="w-full py-3 premium-btn hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
                                             CALL NOW
                                         </button>
@@ -466,20 +395,20 @@
 
                     revenueView.innerHTML = `
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div class="glass-card p-6 bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
+                            <div class="premium-glass-sm p-6 bg-gradient-to-br from-emerald-50 to-white border-emerald-100">
                                 <p class="text-sm font-bold text-emerald-600 uppercase tracking-wide">Today's Revenue</p>
                                 <h3 class="text-3xl font-extrabold text-gray-900 mt-2">₹${todayRev}</h3>
                             </div>
-                            <div class="glass-card p-6 bg-gradient-to-br from-blue-50 to-white border-blue-100">
+                            <div class="premium-glass-sm p-6 bg-gradient-to-br from-blue-50 to-white border-blue-100">
                                 <p class="text-sm font-bold text-blue-600 uppercase tracking-wide">This Week</p>
                                 <h3 class="text-3xl font-extrabold text-gray-900 mt-2">₹${weekRev}</h3>
                             </div>
-                            <div class="glass-card p-6 bg-gradient-to-br from-purple-50 to-white border-purple-100">
+                            <div class="premium-glass-sm p-6 bg-gradient-to-br from-purple-50 to-white border-purple-100">
                                 <p class="text-sm font-bold text-purple-600 uppercase tracking-wide">This Month</p>
                                 <h3 class="text-3xl font-extrabold text-gray-900 mt-2">₹${monthRev}</h3>
                             </div>
                         </div>
-                        <div class="glass-card p-6">
+                        <div class="premium-glass-sm p-6">
                             <h3 class="font-bold text-lg mb-4 text-gray-800">Recent Transactions</h3>
                             <div class="overflow-hidden rounded-xl border border-gray-200">
                                 <table class="min-w-full divide-y divide-gray-200">
@@ -638,7 +567,7 @@
                    snap.forEach(d => {
                        const data = d.data();
                        const div = document.createElement('div');
-                       div.className = "glass-card p-4 mb-4 flex justify-between items-center";
+                       div.className = "premium-glass-sm p-4 mb-4 flex justify-between items-center";
                        const time = data.appointmentAt?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'N/A';
                        const date = data.appointmentAt?.toDate().toLocaleDateString() || 'N/A';
                        let statusColor = data.status === 'pending' ? 'text-yellow-600' : (data.status === 'confirmed' ? 'text-green-600' : 'text-red-600');
@@ -986,9 +915,9 @@
 </head>
 <body class="text-gray-800 antialiased">
 
-    <nav class="hidden md:flex glass-nav fixed top-0 w-full z-50 px-6 lg:px-8 h-16 items-center justify-between">
+    <nav class="hidden md:flex premium-glass rounded-none border-x-0 border-t-0 border-b border-gray-200/50 fixed top-0 w-full z-50 px-6 lg:px-8 h-16 items-center justify-between">
         <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">M</div>
+            <div class="w-8 h-8 rounded-lg premium-btn flex items-center justify-center text-white font-bold text-lg">M</div>
             <span class="text-xl font-bold tracking-tight text-gray-900">MediQue <span class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded ml-1">DOCTOR</span></span>
         </div>
         <div class="flex items-center gap-1">
@@ -1023,15 +952,15 @@
 
             <!-- Stats -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="glass-card p-6">
+                <div class="premium-glass-sm p-6">
                     <p class="text-sm font-medium text-gray-500">Waiting Room</p>
                     <h3 id="dashboard-waiting-count" class="text-3xl font-bold text-gray-900 mt-1">0</h3>
                 </div>
-                <div class="glass-card p-6">
+                <div class="premium-glass-sm p-6">
                     <p class="text-sm font-medium text-gray-500">Completed</p>
                     <h3 id="dashboard-seen-count" class="text-3xl font-bold text-gray-900 mt-1">0</h3>
                 </div>
-                <div class="glass-card p-6">
+                <div class="premium-glass-sm p-6">
                     <p class="text-sm font-medium text-gray-500">Revenue</p>
                     <h3 id="dashboard-revenue" class="text-3xl font-bold text-gray-900 mt-1">₹0</h3>
                 </div>
@@ -1039,13 +968,13 @@
 
             <!-- Up Next & Passcode -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                <div class="lg:col-span-2 glass-card p-6">
+                <div class="lg:col-span-2 premium-glass-sm p-6">
                     <h3 class="text-lg font-bold text-gray-900 mb-4">Up Next</h3>
                     <div id="dashboard-up-next" class="bg-gray-50 rounded-xl border border-gray-200 h-40 flex items-center justify-center text-gray-400">
                          Loading...
                     </div>
                 </div>
-                <div class="glass-card-dark p-6">
+                <div class="premium-glass-sm bg-gray-900 border-gray-700 text-white p-6">
                     <h3 class="text-lg font-bold mb-4">Passcode</h3>
                     <div class="flex items-center justify-between bg-white/10 p-3 rounded-lg">
                         <span id="dashboard-passcode" class="text-2xl font-mono font-bold tracking-widest text-white">...</span>
@@ -1056,7 +985,7 @@
             </div>
 
             <!-- Recent Appts -->
-            <div class="glass-card p-6">
+            <div class="premium-glass-sm p-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">Upcoming Appointments</h3>
                 <div id="dashboard-appt-list"></div>
             </div>
@@ -1090,7 +1019,7 @@
             </div>
             <div id="finance-view-revenue"></div>
             <div id="finance-view-expenses" class="hidden">
-                <div class="glass-card p-6 mb-6">
+                <div class="premium-glass-sm p-6 mb-6">
                     <h3 class="font-bold text-lg mb-4">Add Expense</h3>
                     <form id="expense-form" class="space-y-4">
                         <input type="text" id="ex-cat" placeholder="Category (e.g. Rent)" class="w-full p-2 border rounded" required>
@@ -1101,7 +1030,7 @@
                 <div id="expenses-list" class="space-y-2"></div>
             </div>
             <div id="finance-view-analytics" class="hidden">
-                <div class="glass-card p-6">
+                <div class="premium-glass-sm p-6">
                     <canvas id="finance-chart"></canvas>
                 </div>
             </div>
@@ -1109,7 +1038,7 @@
 
         <!-- PAGE: SETTINGS -->
         <div id="page-settings" class="hidden animate-fade-in">
-            <div class="max-w-xl mx-auto glass-card p-6 space-y-4">
+            <div class="max-w-xl mx-auto premium-glass-sm p-6 space-y-4">
                 <h3 class="text-lg font-bold">Clinic Settings</h3>
                 <div>
                     <label class="block text-sm font-medium mb-1">Location</label>
@@ -1117,7 +1046,7 @@
                         <input type="text" id="set-lat" class="w-1/2 p-2 border rounded" placeholder="Lat">
                         <input type="text" id="set-lon" class="w-1/2 p-2 border rounded" placeholder="Lon">
                     </div>
-                    <button id="save-settings-btn" class="mt-2 w-full bg-indigo-600 text-white py-2 rounded font-medium">Save Location</button>
+                    <button id="save-settings-btn" class="mt-2 w-full premium-btn text-white py-2 rounded font-medium">Save Location</button>
                 </div>
                 <div class="pt-4 border-t">
                     <label class="block text-sm font-medium mb-1">Daily Passcode</label>
@@ -1129,12 +1058,12 @@
 
         <!-- PAGE: EXPORT -->
         <div id="page-export" class="hidden animate-fade-in">
-            <div class="max-w-xl mx-auto glass-card p-8 text-center">
+            <div class="max-w-xl mx-auto premium-glass-sm p-8 text-center">
                 <h3 class="text-xl font-bold mb-4">Financial Reports</h3>
                 <p class="text-gray-500 mb-6">Download detailed PDF reports with AI-generated insights.</p>
                 <div class="flex justify-center gap-4">
                     <button id="export-weekly-report-btn" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-bold shadow hover:bg-blue-700 transition">Weekly PDF</button>
-                    <button id="export-monthly-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition">Monthly PDF</button>
+                    <button id="export-monthly-report-btn" class="px-6 py-3 premium-btn text-white rounded-lg font-bold shadow hover:bg-indigo-700 transition">Monthly PDF</button>
                 </div>
                 <p id="report-status-msg" class="mt-4 text-sm font-medium text-gray-600"></p>
             </div>
@@ -1150,7 +1079,7 @@
             <input type="text" id="priority-input" class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Patient Name...">
             <div class="flex justify-end gap-2">
                 <button id="close-priority-modal" class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                <button id="priority-confirm-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Call Now</button>
+                <button id="priority-confirm-btn" class="px-4 py-2 premium-btn text-white rounded-lg hover:bg-indigo-700">Call Now</button>
             </div>
         </div>
     </div>
@@ -1158,12 +1087,12 @@
     <!-- Notes Modal -->
     <div id="notes-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl w-full max-w-lg flex flex-col max-h-[90vh] shadow-2xl">
-            <div class="bg-indigo-600 p-4 text-white flex justify-between items-center rounded-t-xl">
+            <div class="premium-btn p-4 text-white flex justify-between items-center rounded-t-xl">
                 <h3 class="font-bold">Visit Details: <span id="modal-patient-name"></span></h3>
                 <button id="close-notes-modal" class="hover:text-gray-200 text-2xl font-bold">&times;</button>
             </div>
             <div class="p-6 overflow-y-auto custom-scrollbar">
-                <div id="patient-history-list" class="mb-4 space-y-2"></div>
+                <div id="patient-history-list" class="mb-4 space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar"></div>
                 <form id="notes-form" class="space-y-4 border-t pt-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Diagnosis / Notes</label>
@@ -1179,7 +1108,7 @@
                             <input id="next-visit-date" type="date" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-600">
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Complete & Print PDF</button>
+                    <button type="submit" class="w-full premium-btn hover:bg-emerald-700 text-white py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Complete & Print PDF</button>
                 </form>
             </div>
         </div>

@@ -1,0 +1,64 @@
+name: mediqueue_app
+description: "A unified clinic queue management mobile app for Patients, Doctors, and Receptionists."
+publish_to: 'none'
+
+version: 2.0.0+2
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # Backend and Auth
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
+  cloud_firestore: ^5.0.0
+  cloud_functions: ^5.1.1
+  firebase_messaging: ^15.0.3
+  flutter_local_notifications: ^17.2.1
+  vibration: ^3.0.1
+  flutter_ringtone_player: ^4.0.0
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # Geofencing
+  geolocator: ^11.0.0
+  
+  # QR Code (payment)
+  qr_flutter: ^4.1.0
+  
+  # Utilities
+  url_launcher: ^6.2.5
+  google_fonts: ^6.1.0
+  intl: ^0.19.0
+  shared_preferences: ^2.2.3
+  local_auth: ^2.1.8
+  http: ^1.2.0
+
+  # UI & Animations
+  flutter_animate: ^4.5.0
+  shimmer: ^3.0.0
+  lottie: ^3.1.0
+  badges: ^3.1.2
+
+  # PDF Generation
+  pdf: ^3.10.8
+  printing: ^5.13.1
+  mobile_scanner: ^7.2.0
+  image_picker: ^1.2.2
+  firebase_storage: ^12.4.10
+  marquee: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png

@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <title>MediQue - Patient Dashboard</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/premium-ui.css">
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, setPersistence, browserLocalPersistence, onAuthStateChanged, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, setDoc, getDoc, getDocs, updateDoc, orderBy, Timestamp, collectionGroup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyDqdSzRr29kDUH-eDwXTSg_dImTOqyYCiU",
+          authDomain: "main-8c336.firebaseapp.com",
+          projectId: "main-8c336",
+          storageBucket: "main-8c336.firebasestorage.app",
+          messagingSenderId: "507656529909",
+          appId: "1:507656529909:web:ccea008f4a1178bf0da2bc",
+          measurementId: "G-RX4KHQRQMJ"
+        };
+        const appId = firebaseConfig.projectId;
+        const ADMIN_EMAIL = "prajansanjayko@gmail.com";
+        const DAILY_PASS_KEY = 'mediqueue_daily_pass';
+
+        window.onload = async () => {
+            // Safe Service Worker Registration
+            if ('serviceWorker' in navigator) {
+                if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+                    try { await navigator.serviceWorker.register('/sw.js'); } catch (err) { console.warn("SW registration failed:", err); }
+                }
+            }
+            let deferredInstallPrompt = null;
+
+            // DOM Elements
+            let app, db, auth;
+            let patientApp;
+            let patientPages = {};
+            let mainNav, authControls, userDisplay, logoutBtn, welcomeHeader;
+            let bottomNav, bottomNavDashboard, bottomNavAppointments, bottomNavHistory, bottomNavProfile;
+            let bottomNavItems = []; 
+            let dashboardWelcome, dashboardShortcuts, dashboardJoinQueueBtn, dashboardScanQRBtn; 
+            let queueStatusSection, queueMessageEl, queueNumberEl, queueEstimateEl, queueClosedMsg, queueScanCheckinBtn;
+            let joinQueueModal, joinQueueModalClose, joinQueueForm, joinQueueBtnModal, patientNameInput, patientMobileInput, patientIssueInput;
+            let modalStepForm, modalStepError, modalErrorMsg;
+            let historyList, historyMsg;
+            let aptDateInput, aptTimeSelect, aptReasonInput, aptBookBtn, myAptList, myAptMsg;
+            let profileNameInput, profileMobileInput, profileUpdateBtn, profileMsg, mobileLogoutBtn, installPwaBtn;
+            let loadingOverlay, modal, modalMessage, modalCloseBtn;
+            
+            // QR Scanner Elements (Updated for API)
+            let qrScannerModal, qrScannerCloseBtn, html5QrCode;
+            
+            let tourOverlay, tourBox, tourTitle, tourDesc, tourNextBtn;
+
+            // App State
+            let currentUserId = null, currentUserEmail = null, currentUserDisplayName = null;
+            let isAuthReady = false;
+            let myQueueUnsubscribe = null, historyUnsubscribe = null, clinicStatusUnsubscribe = null;
+            let patientQueueCountUnsubscribe = null, myAppointmentsUnsubscribe = null, profileUnsubscribe = null;
+            let currentDailyLimit = 999; 
+            let hasPlayedSound = false;
+            let notificationSynth = null;
+            let clinicPasscode = null; 
+            let joinMode = 'pre_registered';
+            let isScanning = false;
+            let isTutorialMode = false;
+            let currentTourStep = 0;
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                await setPersistence(auth, browserLocalPersistence);
+            } catch (error) {
+                console.error("Firebase Init Error:", error);
+                alert("Error initializing app.");
+                return;
+            }
+
+            // =========================================================
+            // CORE FUNCTIONS
+            // =========================================================
+
+            function attachProfileListener() {
+                if (!isAuthReady || !db || !currentUserId) return;
+                const profileRef = doc(db, `artifacts/${appId}/users/${currentUserId}/profile/details`);
+                
+                if(profileUnsubscribe) profileUnsubscribe();
+
+                profileUnsubscribe = onSnapshot(profileRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        if (profileNameInput) profileNameInput.value = data.name || '';
+                        if (profileMobileInput) profileMobileInput.value = data.mobile || '';
+                    } else {
+                        if (profileNameInput) profileNameInput.value = currentUserDisplayName || '';
+                    }
+                }, (error) => {
+                    console.error("Error getting profile:", error);
+                });
+            }
+
+            async function populateTimeSlots(selectedDate) {
+                if (!aptTimeSelect) return;
+                aptTimeSelect.innerHTML = '<option value="">Loading slots...</option>';
+                aptTimeSelect.disabled = true;
+
+                if (!selectedDate) {
+                     aptTimeSelect.innerHTML = '<option value="">Select a date first</option>';
+                     return;
+                }
+
+                const d = new Date(selectedDate);
+                if (isNaN(d.getTime())) {
+                    aptTimeSelect.innerHTML = '<option value="">Invalid Date</option>';
+                    return;
+                }
+
+                const standardSlots = [];
+                for(let i=9; i<17; i++) {
+                    standardSlots.push(`${i < 10 ? '0'+i : i}:00`);
+                    standardSlots.push(`${i < 10 ? '0'+i : i}:30`);
+                }
+
+                try {
+                    const startOfDay = new Date(selectedDate); startOfDay.setHours(0,0,0,0);
+                    const endOfDay = new Date(selectedDate); endOfDay.setHours(23,59,59,999);
+
+                    const q = query(collectionGroup(db, "appointments"), 
+                        where("appointmentAt", ">=", Timestamp.fromDate(startOfDay)),
+                        where("appointmentAt", "<=", Timestamp.fromDate(endOfDay)),
+                        where("status", "in", ["pending", "confirmed"])
+                    );
+
+                    const snap = await getDocs(q);
+                    const takenTimes = new Set();
+                    
+                    snap.forEach(doc => {
+                        const data = doc.data();
+                        if(data.appointmentAt) {
+                            const date = data.appointmentAt.toDate();
+                            const hours = date.getHours().toString().padStart(2, '0');
+                            const minutes = date.getMinutes().toString().padStart(2, '0');
+                            takenTimes.add(`${hours}:${minutes}`);
+                        }
+                    });
+
+                    let optionsHtml = '<option value="">Select a time</option>';
+                    standardSlots.forEach(time => {
+                        if (takenTimes.has(time)) {
+                            optionsHtml += `<option value="${time}" disabled class="bg-gray-100 text-gray-400">${time} (Booked)</option>`;
+                        } else {
+                            optionsHtml += `<option value="${time}">${time}</option>`;
+                        }
+                    });
+
+                    aptTimeSelect.innerHTML = optionsHtml;
+                    aptTimeSelect.disabled = false;
+
+                } catch (e) {
+                    console.error("Error fetching slots", e);
+                    aptTimeSelect.innerHTML = '<option value="">Error loading slots</option>';
+                }
+            }
+
+            function showPatientView(pageId) {
+                if (!patientApp) return;
+                Object.values(patientPages).forEach(p => p.style.display = 'none');
+                if (patientPages[pageId]) patientPages[pageId].style.display = 'block';
+                bottomNavItems.forEach(b => b?.classList.remove('bottom-nav-active'));
+                
+                [clinicStatusUnsubscribe, patientQueueCountUnsubscribe, myQueueUnsubscribe, historyUnsubscribe, myAppointmentsUnsubscribe, profileUnsubscribe].forEach(u => u && u());
+
+                if (pageId === 'dashboard') { 
+                    bottomNavDashboard?.classList.add('bottom-nav-active');
+                    if("Notification" in window && Notification.permission !== "denied") Notification.requestPermission();
+                    attachClinicStatusListener();
+                    attachPatientQueueListener();
+                } else if (pageId === 'appointments') {
+                    bottomNavAppointments?.classList.add('bottom-nav-active');
+                    attachMyAppointmentListener();
+                    if(aptDateInput && aptDateInput.value) populateTimeSlots(aptDateInput.value);
+                } else if (pageId === 'history') {
+                    bottomNavHistory?.classList.add('bottom-nav-active');
+                    attachHistoryListener();
+                } else if (pageId === 'profile') {
+                    bottomNavProfile?.classList.add('bottom-nav-active');
+                    attachProfileListener(); 
+                }
+            }
+
+            function attachClinicStatusListener() {
+                clinicStatusUnsubscribe = onSnapshot(doc(db, `artifacts/${appId}/public/data/clinicStatus/status`), (snap) => {
+                    if (snap.exists()) {
+                        clinicPasscode = snap.data().remotePasscode;
+                        currentDailyLimit = parseInt(snap.data().dailyLimit || 999);
+                    }
+                    attachPatientQueueCountListener();
+                });
+            }
+
+            function attachPatientQueueCountListener() {
+                const today = new Date(); today.setHours(0,0,0,0);
+                const tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
+                const q = query(collection(db, `artifacts/${appId}/public/data/queue`), where("joinedAt", ">=", Timestamp.fromDate(today)), where("joinedAt", "<", Timestamp.fromDate(tmrw)));
+                patientQueueCountUnsubscribe = onSnapshot(q, (snap) => {
+                    if (snap.size >= currentDailyLimit && queueClosedMsg) {
+                        dashboardJoinQueueBtn.parentElement.style.display = 'none'; 
+                        queueClosedMsg.style.display = 'block';
+                        queueClosedMsg.textContent = `Queue full (${currentDailyLimit} limit).`;
+                    } else {
+                        if(queueClosedMsg) queueClosedMsg.style.display = 'none';
+                        if(dashboardJoinQueueBtn) dashboardJoinQueueBtn.parentElement.style.display = 'grid';
+                    }
+                });
+            }
+
+            function attachPatientQueueListener() {
+                const q = query(collection(db, `artifacts/${appId}/public/data/queue`), where("patientId", "==", currentUserId), where("status", "in", ["waiting", "pre_registered"]), orderBy("joinedAt", "asc"));
+                myQueueUnsubscribe = onSnapshot(q, (snap) => {
+                    if (snap.empty) {
+                        if(queueStatusSection) queueStatusSection.style.display = 'none';
+                        if(dashboardWelcome) dashboardWelcome.style.display = 'block';
+                        if(dashboardShortcuts) dashboardShortcuts.style.display = 'block';
+                        return;
+                    }
+                    const myDoc = snap.docs[0];
+                    const data = myDoc.data();
+                    
+                    if(queueStatusSection) queueStatusSection.style.display = 'block';
+                    if(dashboardWelcome) dashboardWelcome.style.display = 'none';
+                    if(dashboardShortcuts) dashboardShortcuts.style.display = 'none';
+                    if(queueScanCheckinBtn) queueScanCheckinBtn.style.display = 'none';
+
+                    if (data.status === 'pre_registered') {
+                        if(queueMessageEl) queueMessageEl.textContent = "You are Pre-Registered";
+                        if(queueNumberEl) queueNumberEl.textContent = "En Route";
+                        if(queueEstimateEl) queueEstimateEl.textContent = "Check-in upon arrival";
+                        if(queueScanCheckinBtn) queueScanCheckinBtn.style.display = 'flex';
+                        queueStatusSection.className = "mt-4 p-8 rounded-2xl shadow-xl text-white bg-gradient-to-br from-purple-600 to-pink-600 animate-fade-in";
+                    } else {
+                        const qWait = query(collection(db, `artifacts/${appId}/public/data/queue`), where("status", "==", "waiting"), orderBy("joinedAt", "asc"));
+                        getDocs(qWait).then(s => {
+                            const ids = s.docs.map(d => d.id);
+                            const pos = ids.indexOf(myDoc.id) + 1;
+                            if (pos === 1) {
+                                if(queueMessageEl) queueMessageEl.textContent = "It's your turn!";
+                                if(queueNumberEl) queueNumberEl.textContent = "Proceed";
+                                if(queueEstimateEl) queueEstimateEl.textContent = "Doctor is ready";
+                                queueStatusSection.className = "mt-4 p-8 rounded-2xl shadow-xl text-white bg-gradient-to-br from-emerald-500 to-teal-600 animate-pulse";
+                                if (!hasPlayedSound) {
+                                    const synth = new Tone.Synth().toDestination();
+                                    Tone.start().then(() => { synth.triggerAttackRelease("C5", "8n"); hasPlayedSound = true; });
+                                    if(Notification.permission==="granted") new Notification("It's your turn!");
+                                }
+                            } else {
+                                if(queueMessageEl) queueMessageEl.textContent = "Position in Queue";
+                                if(queueNumberEl) queueNumberEl.textContent = `#${pos}`;
+                                if(queueEstimateEl) queueEstimateEl.textContent = `~ ${pos * 5} min wait`;
+                                queueStatusSection.className = "mt-4 p-8 rounded-2xl shadow-xl text-white bg-gradient-to-br from-blue-600 to-indigo-600";
+                                hasPlayedSound = false;
+                            }
+                        });
+                    }
+                });
+            }
+
+            function attachHistoryListener() {
+                const q = query(collection(db, `artifacts/${appId}/users/${currentUserId}/visits`), orderBy("visitedAt", "desc"));
+                historyUnsubscribe = onSnapshot(q, (snap) => {
+                    if(historyList) historyList.innerHTML = '';
+                    if(snap.empty) { if(historyMsg) historyMsg.style.display='block'; return; }
+                    if(historyMsg) historyMsg.style.display='none';
+                    snap.forEach(d => {
+                        const v = d.data();
+                        const date = v.visitedAt?.toDate().toLocaleDateString() || 'N/A';
+                        historyList.innerHTML += `
+                            <li class="premium-glass-sm p-5 mb-4 border border-gray-100 animate-fade-in">
+                                <div class="flex justify-between items-start mb-2">
+                                    <h3 class="font-bold text-indigo-700">${date}</h3>
+                                    ${v.fee ? `<span class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-1 rounded">₹${v.fee}</span>` : ''}
+                                </div>
+                                <div class="text-sm text-gray-600 space-y-1">
+                                    <p><span class="font-semibold">Reason:</span> ${v.issue||'N/A'}</p>
+                                    <p class="bg-gray-50 p-2 rounded mt-2"><span class="font-semibold text-gray-800">Notes:</span> ${v.notes||'-'}</p>
+                                </div>
+                            </li>`;
+                    });
+                });
+            }
+
+            function attachMyAppointmentListener() {
+                const q = query(collectionGroup(db, "appointments"), where("patientId", "==", currentUserId), orderBy("appointmentAt", "asc"));
+                myAppointmentsUnsubscribe = onSnapshot(q, (snap) => {
+                    if(myAptList) myAptList.innerHTML = '';
+                    if(snap.empty) { if(myAptMsg) myAptMsg.style.display='block'; return; }
+                    if(myAptMsg) myAptMsg.style.display='none';
+                    snap.forEach(d => {
+                        const a = d.data();
+                        const date = a.appointmentAt?.toDate().toLocaleString(undefined, {dateStyle:'medium', timeStyle:'short'});
+                        let statusClass = a.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : (a.status==='declined'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700');
+                        myAptList.innerHTML += `
+                            <li class="premium-glass-sm p-4 mb-3 border-l-4 ${a.status==='confirmed'?'border-emerald-500':(a.status==='declined'?'border-red-500':'border-yellow-500')} animate-fade-in">
+                                <div class="flex justify-between">
+                                    <span class="font-bold text-gray-800">${date}</span>
+                                    <span class="text-xs font-bold px-2 py-1 rounded uppercase ${statusClass}">${a.status}</span>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-1">${a.reason}</p>
+                            </li>`;
+                    });
+                });
+            }
+
+            async function checkOnboardingStatus() {
+                if (!currentUserId) return;
+                const profileRef = doc(db, `artifacts/${appId}/users/${currentUserId}/profile/details`);
+                const snap = await getDoc(profileRef);
+                
+                if (!snap.exists() || !snap.data().onboardingCompleted) {
+                    startTour();
+                }
+            }
+
+            function startTour() {
+                isTutorialMode = true;
+                currentTourStep = 0;
+                tourOverlay.style.display = 'block'; 
+                showTourStep();
+            }
+
+            function showTourStep() {
+                document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+                const steps = [
+                    { el: 'page-dashboard', title: "Welcome to MediQue!", desc: "Check your queue status or join instantly.", action: () => showPatientView('dashboard') },
+                    { el: 'btn-join-home', title: "Join from Home", desc: "Pre-register before you leave to save your spot.", action: () => {} },
+                    { el: 'nav-apt', title: "Book Appointments", desc: "Need to see the doctor later? Book a specific slot.", action: () => {} },
+                    { el: 'page-appointments', title: "Try a Mock Booking", desc: "Try booking a slot now! It's just a simulation.", action: () => showPatientView('appointments') }
+                ];
+
+                if (currentTourStep >= steps.length) { completeTour(); return; }
+                const step = steps[currentTourStep];
+                step.action(); 
+
+                setTimeout(() => {
+                    const targetEl = document.getElementById(step.el);
+                    if (targetEl) {
+                        targetEl.classList.add('tour-highlight');
+                        tourTitle.textContent = step.title;
+                        tourDesc.textContent = step.desc;
+                        tourNextBtn.textContent = (currentTourStep === steps.length - 1) ? "Finish" : "Next";
+
+                        const rect = targetEl.getBoundingClientRect();
+                        const boxRect = tourBox.getBoundingClientRect();
+                        
+                        let top = rect.bottom + 20;
+                        let left = rect.left + (rect.width / 2) - (boxRect.width / 2);
+
+                        if (top + boxRect.height > window.innerHeight) top = rect.top - boxRect.height - 20;
+                        if (left < 10) left = 10;
+                        if (left + boxRect.width > window.innerWidth) left = window.innerWidth - boxRect.width - 10;
+
+                        tourBox.style.top = `${top}px`;
+                        tourBox.style.left = `${left}px`;
+                    }
+                }, 100);
+            }
+
+            async function completeTour() {
+                isTutorialMode = false;
+                tourOverlay.style.display = 'none';
+                document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+                await setDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/profile/details`), { onboardingCompleted: true }, { merge: true });
+                showModal("You're all set!");
+            }
+
+            async function joinQueue(e) {
+                e.preventDefault();
+                const name = patientNameInput.value.trim();
+                const mobile = patientMobileInput.value.trim();
+                const issue = patientIssueInput.value.trim();
+                if (!name || !issue) return showModal("Please fill all details.");
+                
+                joinQueueBtnModal.disabled = true;
+                joinQueueBtnModal.textContent = "Joining...";
+                try {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/queue`), { name, mobile, issue, patientId: currentUserId, status: joinMode, joinedAt: serverTimestamp() });
+                    if(joinQueueModal) joinQueueModal.style.display = 'none';
+                    if(patientIssueInput) patientIssueInput.value = '';
+                } catch(e) { console.error(e); showModal("Error joining queue."); }
+                joinQueueBtnModal.disabled = false;
+                joinQueueBtnModal.textContent = "Confirm";
+            }
+
+            function showModal(msg) {
+                if(modalMessage) modalMessage.textContent = msg;
+                if(modal) modal.style.display = 'flex';
+            }
+
+            // --- CORRECTED QR LOGIC: Use Html5Qrcode (Class) not Scanner (Widget) ---
+            function startScanner() {
+                if (isScanning) return;
+                isScanning = true;
+                if (qrScannerModal) qrScannerModal.style.display = 'flex';
+                
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("qr-reader-region");
+                }
+                
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                // Start the camera explicitly using the API, not the widget
+                html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+                .catch(err => {
+                    console.error("Error starting scanner", err);
+                    showModal("Camera access failed.");
+                    stopScanner();
+                });
+            }
+
+            async function stopScanner() {
+                isScanning = false;
+                if (html5QrCode && html5QrCode.isScanning) {
+                    try { 
+                        await html5QrCode.stop(); 
+                        // html5QrCode.clear(); // Optional depending on library version behavior
+                    } catch (e) { 
+                        console.warn("Error stopping scanner", e); 
+                    }
+                }
+                if (qrScannerModal) qrScannerModal.style.display = 'none';
+            }
+            
+            async function onScanSuccess(decodedText, decodedResult) {
+                if (!isScanning) return;
+                isScanning = false;
+                await stopScanner(); // Stop camera immediately
+                try {
+                    const url = new URL(decodedText);
+                    const pass = url.searchParams.get('pass');
+                    if (pass) await checkPasscodeFromURL(pass);
+                    else showModal("Invalid QR Code.");
+                } catch (err) {
+                    if(decodedText && decodedText.length < 10) await checkPasscodeFromURL(decodedText);
+                    else showModal("Invalid QR Code.");
+                }
+            }
+
+            async function checkPasscodeFromURL(pass) {
+                if (!pass) {
+                    const params = new URLSearchParams(window.location.search);
+                    pass = params.get('pass');
+                    if (!pass) return;
+                }
+                try {
+                    const statusRef = doc(db, `artifacts/${appId}/public/data/clinicStatus/status`);
+                    const docSnap = await getDoc(statusRef);
+                    if (docSnap.exists() && docSnap.data().remotePasscode) {
+                        const correct = docSnap.data().remotePasscode;
+                        clinicPasscode = correct;
+                        if (pass.toUpperCase() === correct) {
+                            localStorage.setItem(DAILY_PASS_KEY, JSON.stringify({ pass: correct, date: new Date().toLocaleDateString() }));
+                            if (isAuthReady && currentUserId) {
+                                const checkedIn = await checkInPreRegisteredUser();
+                                if (!checkedIn) {
+                                    joinMode = 'waiting';
+                                    if (joinQueueModal) joinQueueModal.style.display = 'flex';
+                                    if (modalStepForm) modalStepForm.style.display = 'block';
+                                    if (modalStepError) modalStepError.style.display = 'none';
+                                } else {
+                                    showModal("Checked in successfully!");
+                                }
+                            } else {
+                                showModal("Pass verified! Please log in.");
+                            }
+                        } else showModal("Invalid passcode.");
+                    }
+                } catch (e) { showModal("Connection error."); }
+                if (window.location.search.includes('pass=')) window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            async function checkInPreRegisteredUser() {
+                if (!currentUserId) return false;
+                const q = query(collection(db, `artifacts/${appId}/public/data/queue`), where("patientId", "==", currentUserId), where("status", "==", "pre_registered"));
+                try {
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        await updateDoc(snap.docs[0].ref, { status: "waiting", joinedAt: serverTimestamp() });
+                        return true;
+                    }
+                    return false;
+                } catch (e) { return false; }
+            }
+
+            async function verifyDailyPass() {
+                const stored = JSON.parse(localStorage.getItem(DAILY_PASS_KEY) || '{}');
+                if (stored.date !== new Date().toLocaleDateString()) { localStorage.removeItem(DAILY_PASS_KEY); return false; }
+                if (!clinicPasscode) {
+                    const snap = await getDoc(doc(db, `artifacts/${appId}/public/data/clinicStatus/status`));
+                    if(snap.exists()) clinicPasscode = snap.data().remotePasscode;
+                }
+                return stored.pass === clinicPasscode;
+            }
+
+            async function handleLogout() {
+                await signOut(auth);
+                localStorage.removeItem(DAILY_PASS_KEY);
+                window.location.href = 'index.html';
+            }
+
+            async function handleProfileUpdate(e) {
+                e.preventDefault();
+                if (!profileNameInput || !profileMobileInput) return;
+                profileUpdateBtn.disabled = true;
+                try {
+                    await updateProfile(auth.currentUser, { displayName: profileNameInput.value });
+                    await setDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/profile/details`), { name: profileNameInput.value, mobile: profileMobileInput.value }, { merge: true });
+                    showModal("Profile Updated");
+                } catch(e) { showModal("Error updating profile"); }
+                profileUpdateBtn.disabled = false;
+            }
+
+            // Element Getters
+            patientApp = document.getElementById('patient-app');
+            patientPages = {
+                dashboard: document.getElementById('page-dashboard'),
+                appointments: document.getElementById('page-appointments'),
+                history: document.getElementById('page-history'),
+                profile: document.getElementById('page-profile')
+            };
+            
+            mainNav = document.getElementById('main-nav');
+            logoutBtn = document.getElementById('logout-btn');
+            bottomNav = document.getElementById('bottom-nav');
+            bottomNavDashboard = document.getElementById('nav-dash');
+            bottomNavAppointments = document.getElementById('nav-apt');
+            bottomNavHistory = document.getElementById('nav-hist');
+            bottomNavProfile = document.getElementById('nav-prof');
+            bottomNavItems = [bottomNavDashboard, bottomNavAppointments, bottomNavHistory, bottomNavProfile];
+
+            dashboardWelcome = document.getElementById('dash-welcome');
+            dashboardShortcuts = document.getElementById('dash-shortcuts');
+            dashboardJoinQueueBtn = document.getElementById('btn-join-home');
+            dashboardScanQRBtn = document.getElementById('btn-scan-qr');
+            queueStatusSection = document.getElementById('queue-card');
+            queueMessageEl = document.getElementById('q-msg');
+            queueNumberEl = document.getElementById('q-num');
+            queueEstimateEl = document.getElementById('q-est');
+            queueScanCheckinBtn = document.getElementById('q-scan-btn');
+            queueClosedMsg = document.getElementById('q-closed-msg');
+
+            joinQueueModal = document.getElementById('modal-join');
+            joinQueueModalClose = document.getElementById('modal-join-close');
+            joinQueueForm = document.getElementById('form-join');
+            joinQueueBtnModal = document.getElementById('btn-join-confirm');
+            patientNameInput = document.getElementById('inp-name');
+            patientMobileInput = document.getElementById('inp-mobile');
+            patientIssueInput = document.getElementById('inp-issue');
+            modalStepForm = document.getElementById('step-form');
+            modalStepError = document.getElementById('step-error');
+            
+            qrScannerModal = document.getElementById('modal-qr');
+            qrScannerCloseBtn = document.getElementById('btn-qr-close');
+
+            historyList = document.getElementById('list-history');
+            historyMsg = document.getElementById('msg-history');
+
+            aptDateInput = document.getElementById('inp-apt-date');
+            aptTimeSelect = document.getElementById('inp-apt-time');
+            aptReasonInput = document.getElementById('inp-apt-reason');
+            aptBookBtn = document.getElementById('btn-apt-book');
+            myAptList = document.getElementById('list-apt');
+            myAptMsg = document.getElementById('msg-apt');
+
+            profileNameInput = document.getElementById('inp-prof-name');
+            profileMobileInput = document.getElementById('inp-prof-mobile');
+            profileUpdateBtn = document.getElementById('btn-prof-update');
+            profileMsg = document.getElementById('msg-prof');
+            mobileLogoutBtn = document.getElementById('btn-prof-logout');
+            installPwaBtn = document.getElementById('btn-pwa');
+
+            modal = document.getElementById('modal-global');
+            modalMessage = document.getElementById('msg-global');
+            modalCloseBtn = document.getElementById('btn-global-close');
+            
+            tourOverlay = document.getElementById('tour-overlay');
+            tourBox = document.getElementById('tour-box');
+            tourTitle = document.getElementById('tour-title');
+            tourDesc = document.getElementById('tour-desc');
+            tourNextBtn = document.getElementById('tour-next-btn');
+
+            // Event Listeners
+            if(logoutBtn) logoutBtn.onclick = handleLogout;
+            if(mobileLogoutBtn) mobileLogoutBtn.onclick = handleLogout;
+            if(modalCloseBtn) modalCloseBtn.onclick = () => modal.style.display='none';
+            
+            if(dashboardJoinQueueBtn) dashboardJoinQueueBtn.onclick = () => {
+                joinMode = 'pre_registered';
+                if(modalStepForm) modalStepForm.style.display='block';
+                if(modalStepError) modalStepError.style.display='none';
+                if(joinQueueModal) joinQueueModal.style.display='flex';
+            };
+            if(dashboardScanQRBtn) dashboardScanQRBtn.onclick = startScanner;
+            if(queueScanCheckinBtn) queueScanCheckinBtn.onclick = startScanner;
+            if(qrScannerCloseBtn) qrScannerCloseBtn.onclick = stopScanner;
+            if(joinQueueModalClose) joinQueueModalClose.onclick = () => joinQueueModal.style.display='none';
+            if(joinQueueForm) joinQueueForm.onsubmit = joinQueue;
+
+            if(aptBookBtn) aptBookBtn.onclick = async () => {
+                if(!aptDateInput.value || !aptTimeSelect.value || !aptReasonInput.value) return showModal("Fill all fields");
+                
+                // MOCK MODE CHECK
+                if (isTutorialMode) {
+                    showModal("🎉 Simulation: Appointment 'Requested'! (No data saved)");
+                    currentTourStep++;
+                    showTourStep();
+                    return;
+                }
+
+                let dt = new Date(`${aptDateInput.value}T${aptTimeSelect.value}`);
+                if(dt < new Date()) return showModal("Invalid time");
+                
+                aptBookBtn.disabled = true;
+                try {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/appointments`), { 
+                        patientId: currentUserId, 
+                        patientName: currentUserDisplayName, 
+                        reason: aptReasonInput.value, 
+                        appointmentAt: Timestamp.fromDate(dt), 
+                        status: "pending" 
+                    });
+                    showModal("Request Sent!");
+                    aptReasonInput.value = '';
+                    populateTimeSlots(aptDateInput.value); // Refresh slots
+                } catch(e) {
+                    console.error(e);
+                    showModal("Booking Failed.");
+                }
+                aptBookBtn.disabled = false;
+            };
+            
+            if(aptDateInput) aptDateInput.onchange = () => populateTimeSlots(aptDateInput.value);
+
+            if(profileUpdateBtn) profileUpdateBtn.onclick = handleProfileUpdate;
+
+            if(tourNextBtn) tourNextBtn.onclick = () => {
+                currentTourStep++;
+                showTourStep();
+            };
+
+            if(aptDateInput) aptDateInput.min = new Date().toISOString().split('T')[0];
+
+            bottomNavItems.forEach((btn, i) => {
+                const pages = ['dashboard', 'appointments', 'history', 'profile'];
+                if(btn) btn.onclick = () => showPatientView(pages[i]);
+            });
+
+            window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; if(installPwaBtn) installPwaBtn.style.display='flex'; });
+            if(installPwaBtn) installPwaBtn.onclick = async () => { if(deferredInstallPrompt) { deferredInstallPrompt.prompt(); deferredInstallPrompt=null; installPwaBtn.style.display='none'; }};
+
+            onAuthStateChanged(auth, async (user) => {
+                isAuthReady = true;
+                if (user) {
+                    if(user.email === ADMIN_EMAIL) return window.location.href = 'doctor.html';
+                    currentUserId = user.uid;
+                    currentUserEmail = user.email;
+                    currentUserDisplayName = user.displayName || 'Patient';
+                    if(userDisplay) userDisplay.textContent = currentUserDisplayName;
+                    
+                    if(mainNav) mainNav.style.display='flex';
+                    if(bottomNav) bottomNav.style.display='flex';
+                    if(patientApp) patientApp.style.display='block';
+
+                    await checkPasscodeFromURL();
+                    if(await verifyDailyPass()) await checkInPreRegisteredUser();
+
+                    if(patientNameInput) patientNameInput.value = currentUserDisplayName;
+                    getDoc(doc(db, `artifacts/${appId}/users/${currentUserId}/profile/details`)).then(s => { if(s.exists() && patientMobileInput) patientMobileInput.value = s.data().mobile||''; });
+
+                    showPatientView('dashboard');
+                    checkOnboardingStatus(); // Trigger Tour Check
+                } else {
+                    await checkPasscodeFromURL();
+                    if(!auth.currentUser) window.location.href='index.html';
+                }
+            });
+        };
+    </script>
+</head>
+<body class="text-gray-800 antialiased pb-24">
+
+    <!-- Top Nav (Desktop) -->
+    <nav class="premium-glass rounded-none border-x-0 border-t-0 border-b border-gray-200/50 fixed top-0 w-full z-50 px-6 h-16 hidden md:flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg premium-btn flex items-center justify-center text-white font-bold text-lg">M</div>
+            <span class="text-xl font-bold tracking-tight text-gray-900">MediQue</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="user-display" class="text-sm font-medium text-gray-600">User</span>
+            <button id="logout-btn" class="text-sm font-medium text-red-600 hover:text-red-700">Logout</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="patient-app" class="pt-6 md:pt-24 px-4 sm:px-6 max-w-lg mx-auto" style="display: none;">
+        
+        <!-- DASHBOARD -->
+        <div id="page-dashboard" class="animate-fade-in">
+            <div id="dash-welcome" class="mb-6">
+                <h1 class="text-3xl font-bold text-gray-900">Hello! 👋</h1>
+                <p class="text-gray-500">How can we help you today?</p>
+            </div>
+
+            <!-- Queue Status Card -->
+            <div id="queue-card" class="mt-4 p-8 rounded-2xl shadow-xl text-white bg-gradient-to-br from-blue-600 to-indigo-600 hidden">
+                <h2 id="q-msg" class="text-xl font-bold mb-2 opacity-90">Position</h2>
+                <p id="q-num" class="text-6xl font-extrabold my-2">#0</p>
+                <p id="q-est" class="text-lg opacity-80 mb-4">~ 0 min</p>
+                <button id="q-scan-btn" class="w-full py-3 rounded-xl bg-white/20 hover:bg-white/30 font-semibold transition flex items-center justify-center gap-2 backdrop-blur-sm hidden">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Scan to Check-In
+                </button>
+            </div>
+
+            <div id="q-closed-msg" class="hidden p-4 bg-orange-100 text-orange-800 rounded-xl text-center font-medium mb-6">
+                Queue is currently full/closed.
+            </div>
+
+            <!-- Shortcuts -->
+            <div id="dash-shortcuts" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="btn-join-home" class="premium-glass-sm p-6 flex flex-col items-center justify-center hover:scale-105 active:scale-95">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </div>
+                        <span class="font-bold text-gray-800">Join Queue</span>
+                        <span class="text-xs text-gray-500">(From Home)</span>
+                    </button>
+                    <button id="btn-scan-qr" class="premium-glass-sm p-6 flex flex-col items-center justify-center hover:scale-105 active:scale-95">
+                        <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </div>
+                        <span class="font-bold text-gray-800">Scan QR</span>
+                        <span class="text-xs text-gray-500">(At Clinic)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- APPOINTMENTS -->
+        <div id="page-appointments" class="hidden animate-fade-in">
+            <h1 class="text-2xl font-bold text-gray-900 mb-6">Appointments</h1>
+            
+            <div class="premium-glass-sm p-5 mb-6">
+                <h3 class="font-bold text-lg mb-4">Book Slot</h3>
+                <div class="space-y-3">
+                    <input type="date" id="inp-apt-date" class="w-full p-3 rounded-xl border">
+                    <select id="inp-apt-time" class="w-full p-3 rounded-xl border bg-white">
+                        <option value="">Select Date First</option>
+                    </select>
+                    <textarea id="inp-apt-reason" placeholder="Reason..." class="w-full p-3 rounded-xl border" rows="2"></textarea>
+                    <button id="btn-apt-book" class="w-full py-3 premium-btn text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition">Request Appointment</button>
+                </div>
+            </div>
+
+            <h3 class="font-bold text-lg mb-3 px-1">My Requests</h3>
+            <div id="msg-apt" class="text-center text-gray-400 py-4">No appointments found.</div>
+            <ul id="list-apt"></ul>
+        </div>
+
+        <!-- HISTORY -->
+        <div id="page-history" class="hidden animate-fade-in">
+            <h1 class="text-2xl font-bold text-gray-900 mb-6">Visit History</h1>
+            <div id="msg-history" class="text-center text-gray-400 py-10">No history found.</div>
+            <ul id="list-history"></ul>
+        </div>
+
+        <!-- PROFILE -->
+        <div id="page-profile" class="hidden animate-fade-in">
+            <h1 class="text-2xl font-bold text-gray-900 mb-6">My Profile</h1>
+            <div class="premium-glass-sm p-6 space-y-4">
+                <div>
+                    <label class="text-sm font-semibold text-gray-600">Full Name</label>
+                    <input type="text" id="inp-prof-name" class="w-full p-3 rounded-xl border mt-1">
+                </div>
+                <div>
+                    <label class="text-sm font-semibold text-gray-600">Mobile Number</label>
+                    <input type="tel" id="inp-prof-mobile" class="w-full p-3 rounded-xl border mt-1">
+                </div>
+                <button id="btn-prof-update" class="w-full py-3 premium-btn text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition">Save Changes</button>
+                <div id="msg-prof" class="text-center text-sm hidden"></div>
+            </div>
+            
+            <button id="btn-pwa" class="hidden w-full mt-4 py-3 bg-gray-900 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2">
+                Install App
+            </button>
+            
+            <button id="btn-prof-logout" class="w-full mt-4 py-3 bg-red-50 text-red-600 font-bold rounded-xl border border-red-100 hover:bg-red-100 transition md:hidden">
+                Logout
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Bottom Nav (Mobile) -->
+    <nav id="bottom-nav" class="premium-glass rounded-none border-x-0 border-t-0 border-b border-gray-200/50 fixed bottom-0 w-full z-50 h-16 flex items-center justify-around md:hidden bg-white/90 backdrop-blur">
+        <button id="nav-dash" class="flex flex-col items-center p-2 text-gray-400 transition bottom-nav-active">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            <span class="text-[10px] font-medium mt-0.5">Home</span>
+        </button>
+        <button id="nav-apt" class="flex flex-col items-center p-2 text-gray-400 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            <span class="text-[10px] font-medium mt-0.5">Book</span>
+        </button>
+        <button id="nav-hist" class="flex flex-col items-center p-2 text-gray-400 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span class="text-[10px] font-medium mt-0.5">History</span>
+        </button>
+        <button id="nav-prof" class="flex flex-col items-center p-2 text-gray-400 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            <span class="text-[10px] font-medium mt-0.5">Profile</span>
+        </button>
+    </nav>
+
+    <!-- Join Queue Modal -->
+    <div id="modal-join" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
+        <div class="premium-glass-sm bg-white p-6 w-full max-w-sm animate-fade-in">
+            <div id="step-form">
+                <h3 class="text-xl font-bold mb-4">Join Queue</h3>
+                <form id="form-join" class="space-y-3">
+                    <input type="text" id="inp-name" class="w-full p-3 rounded-xl border bg-gray-50" readonly>
+                    <input type="tel" id="inp-mobile" class="w-full p-3 rounded-xl border" placeholder="Mobile Number" required>
+                    <textarea id="inp-issue" class="w-full p-3 rounded-xl border" rows="2" placeholder="Reason for visit..." required></textarea>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" id="modal-join-close" class="flex-1 py-3 rounded-xl bg-gray-100 font-bold text-gray-600">Cancel</button>
+                        <button type="submit" id="btn-join-confirm" class="flex-1 py-3 rounded-xl premium-btn text-white font-bold shadow-lg">Confirm</button>
+                    </div>
+                </form>
+            </div>
+            <div id="step-error" class="hidden text-center py-6">
+                <p class="text-red-500 mb-4">Please scan the QR code at the clinic.</p>
+                <button onclick="document.getElementById('modal-join').style.display='none'" class="px-6 py-2 rounded-xl bg-gray-200 font-bold">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div id="modal-qr" class="fixed inset-0 z-[70] hidden items-center justify-center p-4 bg-black/90">
+        <div class="w-full max-w-md bg-white rounded-2xl overflow-hidden relative">
+            <button id="btn-qr-close" class="absolute top-2 right-2 z-10 bg-white/20 p-2 rounded-full text-white">✕</button>
+            <div id="qr-reader-region"></div>
+            <p class="text-center p-4 text-sm text-gray-500">Point camera at clinic QR code</p>
+        </div>
+    </div>
+
+    <!-- Global Message Modal -->
+    <div id="modal-global" class="fixed inset-0 bg-black/50 z-[80] hidden items-center justify-center p-6">
+        <div class="premium-glass-sm bg-white p-6 max-w-sm w-full text-center animate-fade-in">
+            <p id="msg-global" class="text-lg font-medium text-gray-800 mb-6"></p>
+            <button id="btn-global-close" class="px-6 py-2 premium-btn text-white rounded-xl font-bold">OK</button>
+        </div>
+    </div>
+
+    <!-- ONBOARDING TOUR OVERLAY -->
+    <div id="tour-overlay">
+        <div id="tour-box" class="tour-box">
+            <h3 id="tour-title" class="text-lg font-bold text-gray-900 mb-2">Welcome</h3>
+            <p id="tour-desc" class="text-sm text-gray-600 mb-4">Description</p>
+            <button id="tour-next-btn" class="w-full py-2 premium-btn text-white font-bold rounded-lg hover:bg-indigo-700">Next</button>
+            <div class="tour-arrow"></div>
+        </div>
+    </div>
+
+</body>
+</html>
