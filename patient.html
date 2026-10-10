@@ -3,11 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4f46e5" />
+    <meta name="theme-color" content="#0d9488" />
+    <meta name="description" content="MediQue — AI-Powered Real-Time Hospital Queue Management. Track your queue position, get live ETA, and manage appointments.">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon-192x192.png">
-    <title>MediQue - Patient Dashboard</title>
-    
+    <title>MediQue — Patient Dashboard</title>
+
+    <!-- ── MediQue Design System v3.0 ── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="medique-design-system.css">
+
     <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
@@ -18,9 +25,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Google Maps API -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDPYK19vLZ8e297RR4uDBQIz5I_Po4YuIE&libraries=places" async defer></script>
+    <!-- MediQue Shared Components (chatbot, toasts, video, heatmap, i18n) -->
+    <script src="medique-components.js" defer></script>
 
     <style>
         /* --- UI Styles (Matches Doctor Portal) --- */
